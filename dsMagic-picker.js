@@ -248,6 +248,9 @@ var picker = picker || {
                                 if ( typeof(afterCreatingSettingsListFx) === "function" ){
                                     afterCreatingSettingsListFx();
                                 }
+                                if ( confirm("Settings list created. Would you like to refresh the page?") === true ){
+                                    window.location.reload();
+                                }
                             }, function(){
                                 picker.log("dsMagic-picker list - failed to add field 'fieldName'",true);
                             });    
@@ -264,111 +267,6 @@ var picker = picker || {
             }, function(){
                 picker.log("failed to create dsMagic-picker settings list",true);
             });
-            /*
-            ds.rest.list.create(100, sListDisplayName, "stores the settings for the forms on your site", function(cD, cS, cX){
-                listDef = cD.d; 
-                var oSettings1 = {
-                    EnableVersioning: true,
-                    EnableModeration: true,
-                    EnableAttachments: false
-                };
-                ds.rest.list.update(sListDisplayName, oSettings1, function(){
-                    picker.log("Enabled Versioning and disabled Attachments for |"+sListDisplayName+"||");
-                    var oSettings2 = {
-                        MajorVersionLimit: 10,
-                        DraftVersionVisibility: 2,
-                        MajorWithMinorVersionsLimit: 25
-                    };
-                    ds.rest.list.update(sListDisplayName, oSettings2, function(){
-                        picker.log("Finished configuring Versioning for |"+sListDisplayName+"|");
-                        var to1 = setTimeout(function(){
-                            var oField = {
-                                Description:"The form name, as it appears in the URL",
-                                StaticName:"FormNameURL",
-                                EnforceUniqueValues: false
-                            };
-                            ds.rest.list.addField(ds.lists[sListDisplayName].Id, "FormNameURL", 2, false, false, "FormNameURL", null, oField, function(){
-                                picker.log("Added field |FormNameURL| to list");
-                            });
-                            var to2 = setTimeout(function(){
-                                var oField = {
-                                    StaticName:"blbRelRecs"
-                                };
-                                ds.rest.list.addField(ds.lists[sListDisplayName].Id, "blbRelRecs", 3, false, false, "blbRelRecs", null, oField, function(d,s,x){
-                                    picker.log("Added field |blbRelRecs| to list");
-                                    var body = {
-                                        __metadata: { type: 'SP.FieldMultiLineText' }, 
-                                        NumberOfLines: 1,
-                                        RichText: false,
-                                        AppendOnly: false,
-                                        RestrictedMode: true,
-                                        WikiLinking: false
-                                    };
-                                    ds.$.ajax({
-                                        url: d.d.__metadata.uri,
-                                        method: "POST",
-                                        data: JSON.stringify(body),
-                                        headers: {
-                                            "X-HTTP-Method":"MERGE",
-                                            "IF-MATCH": "*"
-                                        }
-                                    }).done(function(data,textStatus,jqXHR){
-                                        ds.rest.lastCall.status = textStatus;
-                                        ds.rest.lastCall.data = data;
-                                        ds.rest.lastCall.jqXHR = jqXHR;
-                                        picker.log("List field |blbRelRecs| updated via REST");
-                                        picker.log(listDef.Fields,true);
-                                        ds.$.ajax({
-                                            url: listDef.Fields.__deferred.uri+"?$filter=StaticName eq 'Title'",
-                                            method: "GET",
-                                            data: null
-                                        }).done(function(data,textStatus,jqXHR){
-                                            picker.log("Got definition of existing list Title field...");
-                                            picker.log(data,true);
-                                            var body2 = {
-                                                __metadata: { type: data.d.results[0].__metadata.type }, 
-                                                Title: "ListNameURL",
-                                                StaticName: data.d.results[0].Title
-                                            };
-                                            picker.log("Attempting update to Title field's Display name...");
-                                            ds.$.ajax({
-                                                url: data.d.results[0].__metadata.uri,
-                                                method: "POST",
-                                                data: JSON.stringify(body2),
-                                                headers: {
-                                                    "X-HTTP-Method":"MERGE",
-                                                    "IF-MATCH": "*"
-                                                }
-                                            }).done(function(data,textStatus,jqXHR){
-                                                ds.rest.lastCall.status = textStatus;
-                                                ds.rest.lastCall.data = data;
-                                                ds.rest.lastCall.jqXHR = jqXHR;
-                                                picker.log("List field |Title| updated to |ListNameURL| via REST");
-                                                if ( typeof(afterCreatingSettingsListFx) === "function" ) {
-                                                    afterCreatingSettingsListFx();
-                                                }
-                                            }).fail(function(jqXHR, textStatus, errorThrown){
-                                                ds.rest.lastCall.status = textStatus;
-                                                ds.rest.lastCall.errorThrown = errorThrown;
-                                                ds.rest.lastCall.jqXHR = jqXHR;
-                                            });
-                                        }).fail(function(jqXHR,textStatus,errorThrown){
-                                            ds.rest.lastCall.status = textStatus;
-                                            ds.rest.lastCall.errorThrown = errorThrown;
-                                            ds.rest.lastCall.jqXHR = jqXHR;
-                                        });
-                                    }).fail(function(jqXHR, textStatus, errorThrown){
-                                        ds.rest.lastCall.status = textStatus;
-                                        ds.rest.lastCall.errorThrown = errorThrown;
-                                        ds.rest.lastCall.jqXHR = jqXHR;
-                                    });
-                                });
-                            },234);
-                        },123);
-                    });
-                });
-            });
-            */
         },
         captureSettings: function(formURL, fieldName, blbSettings){
             /*
@@ -432,6 +330,20 @@ var picker = picker || {
                 picker.log(d,true);
             }, function(){
                 picker.log("Failed to update list item for Settings",true);
+            });
+        },
+        checkIfSettingsListExists: function(fxExists, fxDoesNotExist){
+            var restURL = _spPageContextInfo.webAbsoluteUrl +"/_api/web/lists/GetByTitle('dsMagic-pickers')";
+            picker.ajax.read(restURL, function(x,d){
+                picker.log("Settings list exists",true);
+                if ( typeof(fxExists) === "function" ){
+                    fxExists();
+                }
+            }, undefined, function(){
+                picker.log("Settings list does not exist",true);
+                if ( typeof(fxDoesNotExist) === "function" ) {
+                    fxDoesNotExist();
+                }
             });
         }
     },
@@ -603,7 +515,9 @@ var picker = picker || {
             arrH.push("_configCloseButton'>&times;</span></DIV><H3><DIV class='configForField'>");
             /*arrH.push(control);*/
             arrH.push(picker.findFormField("TopLevelElementId",control).Title);
-            arrH.push("</DIV></H3><H4>Upon resolved user, populate form fields...</H4><TABLE><thead><tr><td>Form Field</td><td>User Property</td><td>Add</td><td>Remove</td></tr></thead><tbody id='");
+            arrH.push("</DIV></H3><H4>Upon resolved user, populate form fields...</H4><TABLE><thead><tr><td>Form Field</td><td>User Property&nbsp;<span class='userPropertyTooltip'><img border='0' alt='help with user property syntax' title='picker.userProperties.propertyName\nor\npicker.userProperties.propertyArray.results|subArrayName.results' src='");
+            arrH.push(_spPageContextInfo.siteAbsoluteUrl);
+            arrH.push("/_layouts/15/images/helpicon.gif'/></span></td><td>Preview</td><td>Add</td><td>Remove</td></tr></thead><tbody id='");
             arrH.push(control);
             arrH.push("_configMappingRowsWrapper'><tr class='mappingRow'><td class='listField'><select class='listField'><option value='0'>Select list field</option>");
             for ( formWP in picker.formFields ) {
@@ -628,7 +542,7 @@ var picker = picker || {
             arrH.push("</select>");
             */
             arrH.push("<INPUT class='userProperty' type='text' placeholder='e.g. picker.userProperties.LoginName' value='' />");
-            arrH.push("</td><td><span class='addNew buttonish'>&plus;&nbsp;Add</span></td><td><span class='removeMapping buttonish'>&minus;&nbsp;Remove</span></td></tr></tbody></TABLE><DIV class='configPopupFooter'><span class='saveButton buttonish' id='");
+            arrH.push("</td><td><span class='userPropertyValuePreview'></span></td><td><span class='addNew buttonish'>&plus;&nbsp;Add</span></td><td><span class='removeMapping buttonish'>&minus;&nbsp;Remove</span></td></tr></tbody></TABLE><DIV class='configPopupFooter'><span class='saveButton buttonish' id='");
             arrH.push(control);
             arrH.push("_configSaveButton'>Save</span></DIV><DIV class='saveSettings'></DIV>");
             configPopup.innerHTML = arrH.join("");
@@ -641,6 +555,42 @@ var picker = picker || {
             
             configButton.addEventListener("click", function(e){
                 this.nextSibling.style.display = "block";
+            });
+
+            configPopup.querySelector("INPUT.userProperty").addEventListener("keyup",function(e){
+                try{
+                    if ( this.value.indexOf("|") < 0 ) {
+                        if ( typeof(eval(this.value)) === "object" ){
+                            if ( typeof(eval(this.value+".length")) !== "undefined" ){
+                                this.parentElement.parentElement.querySelector("SPAN.userPropertyValuePreview").innerText = "array";
+                            }
+                            else {
+                                this.parentElement.parentElement.querySelector("SPAN.userPropertyValuePreview").innerText = eval(this.value);
+                            }
+                        }
+                        else {
+                            this.parentElement.parentElement.querySelector("SPAN.userPropertyValuePreview").innerText = eval(this.value);
+                        }
+                    }
+                    else {
+                        if ( typeof(eval(this.value.split("|")[0] +"[0]."+ this.value.split("|")[1])) === "object" ){
+                            if ( typeof(eval(this.value.split("|")[0] +"[0]."+ this.value.split("|")[1]+".length")) !== "undefined" ){
+                                this.parentElement.parentElement.querySelector("SPAN.userPropertyValuePreview").innerText = "array";
+                            }
+                            else {
+                                this.parentElement.parentElement.querySelector("SPAN.userPropertyValuePreview").innerText = eval(this.value.split("|")[0] +"[0]."+ this.value.split("|")[1]);
+                            }
+                        }
+                        else {
+                            this.parentElement.parentElement.querySelector("SPAN.userPropertyValuePreview").innerText = eval(this.value.split("|")[0] +"[0]."+ this.value.split("|")[1]);
+                        }
+                        
+                    }
+                }
+                catch(err){
+                    picker.log("failed to show userPropertyValue preview",true);
+                    picker.log(err,true);
+                }
             });
 
             configPopup.querySelector(".closeButton").addEventListener("click", function(e){
@@ -730,6 +680,44 @@ var picker = picker || {
                     picker.log(parentRow);
                     parentRow.remove();
                 });
+                picker.parentsUntilMatchingSelector(this, "[id*='_configMappingRowsWrapper']").querySelector(".mappingRow:last-of-type INPUT.userProperty").addEventListener("keyup",function(e){
+                    picker.log("preview");
+                    picker.log(e);
+                    picker.log(this);
+                    try{
+                        if ( this.value.indexOf("|") < 0 ) {
+                            if ( typeof(eval(this.value)) === "object" ){
+                                if ( typeof(eval(this.value+".length")) !== "undefined" ){
+                                    this.parentElement.parentElement.querySelector("SPAN.userPropertyValuePreview").innerText = "array";
+                                }
+                                else {
+                                    this.parentElement.parentElement.querySelector("SPAN.userPropertyValuePreview").innerText = eval(this.value);
+                                }
+                            }
+                            else {
+                                this.parentElement.parentElement.querySelector("SPAN.userPropertyValuePreview").innerText = eval(this.value);
+                            }
+                        }
+                        else {
+                            if ( typeof(eval(this.value.split("|")[0] +"[0]."+ this.value.split("|")[1])) === "object" ){
+                                if ( typeof(eval(this.value.split("|")[0] +"[0]."+ this.value.split("|")[1]+".length")) !== "undefined" ){
+                                    this.parentElement.parentElement.querySelector("SPAN.userPropertyValuePreview").innerText = "array";
+                                }
+                                else {
+                                    this.parentElement.parentElement.querySelector("SPAN.userPropertyValuePreview").innerText = eval(this.value.split("|")[0] +"[0]."+ this.value.split("|")[1]);
+                                }
+                            }
+                            else {
+                                this.parentElement.parentElement.querySelector("SPAN.userPropertyValuePreview").innerText = eval(this.value.split("|")[0] +"[0]."+ this.value.split("|")[1]);
+                            }
+                            
+                        }
+                    }
+                    catch(err){
+                        picker.log("failed to show userPropertyValue preview",true);
+                        picker.log(err,true);
+                    }
+                });
             };
             
             
@@ -808,22 +796,22 @@ var picker = picker || {
                                         try{
                                             if ( typeof(setUserProperty) === "object" ) {
                                                 if ( typeof(setUserProperty.length) !== "undefined" && setUserProperty.length > 0 ) {
-                                                    picker.log("Setting userproperty mapping by looping through the referenced JS array",true);
-                                                    picker.log(setUserProperty,true);
+                                                    picker.log("Setting userproperty mapping by looping through the referenced JS array");
+                                                    picker.log(setUserProperty);
                                                     for ( var iG = 0; iG < setUserProperty.length; iG++ ){
                                                         if ( typeof(setUserSubProperty) !== "undefined" ){
-                                                            picker.log("Setting userproperty mapping by looping through sub-array",true);
+                                                            picker.log("Setting userproperty mapping by looping through sub-array");
                                                             var subLoop = eval("setUserProperty["+iG+"]."+ setUserSubProperty);
-                                                            picker.log(subLoop,true);
+                                                            picker.log(subLoop);
                                                             for ( var iU = 0; iU < subLoop.length; iU++ ){
-                                                                picker.log("picker adding person or group to field with fin |"+ listener.arrMapping[iMapping].fin +"|");
+                                                                picker.log("picker adding person or group to field with fin |"+ listener.arrMapping[iMapping].fin +"|",true);
                                                                 SPClientPeoplePicker.SPClientPeoplePickerDict[picker.findFormField("Name", listener.arrMapping[iMapping].fin).TopLevelElementId].AddUserKeys(subLoop[iU].LoginName);
                                                                 //pickerInstance.spcsom.AddUserKeys(setUserProperty[iG].LoginName);
                                                             }
 
                                                         }
                                                         else {
-                                                            picker.log("picker adding person or group to field with fin |"+ listener.arrMapping[iMapping].fin +"|");
+                                                            picker.log("picker adding person or group to field with fin |"+ listener.arrMapping[iMapping].fin +"|",true);
                                                             SPClientPeoplePicker.SPClientPeoplePickerDict[picker.findFormField("Name", listener.arrMapping[iMapping].fin).TopLevelElementId].AddUserKeys(setUserProperty[iG].LoginName);
                                                             //pickerInstance.spcsom.AddUserKeys(setUserProperty[iG].LoginName);
                                                         }
@@ -861,7 +849,7 @@ var picker = picker || {
     populateCurrentSettings: function(){
         for ( var iPL = 0; iPL < pickerListeners.length; iPL++ ){
             var listener = pickerListeners[iPL];
-            picker.log(listener,true);
+            picker.log(listener);
             var pickerFormField = picker.findFormField("Title", listener.fieldDisplayName);
             if ( !pickerFormField === false ){
                 var pickerTopLevelElementId = pickerFormField.TopLevelElementId;
@@ -871,7 +859,7 @@ var picker = picker || {
                     var pickerConfigMappingTBODY = document.getElementById(pickerTopLevelElementId +"_configMappingRowsWrapper");
                     var mappingRow = pickerConfigMappingTBODY.querySelector(".mappingRow");
                     for ( var iMapping = 0; iMapping < listener.arrMapping.length; iMapping++ ){
-                        picker.log(listener.arrMapping[iMapping],true);
+                        picker.log(listener.arrMapping[iMapping]);
                         var setField = picker.findFormField("Name", listener.arrMapping[iMapping].fin);
                         picker.log(setField);
                         var setFieldElement = document.querySelector("[id*='"+ setField.Id +"']");
@@ -885,11 +873,21 @@ var picker = picker || {
                             try{newRow.querySelector("SELECT.listField OPTION[value='"+ setField.Id +"']").setAttribute("selected","selected");}catch(err){}
                             //try{newRow.querySelector("SELECT.userProperty OPTION[value='"+ userPropertyName +"']").setAttribute("selected","selected");}catch(err){}
                             try{newRow.querySelector("INPUT.userProperty").value = userPropertyName;}catch(err){}
+                            if ( userPropertyName.length > 0 ){
+                                var e = new Event("keyup");
+                                e.which = 16;
+                                newRow.querySelector("INPUT.userProperty").dispatchEvent(e);    
+                            }
                         }
                         else {
                             try{mappingRow.querySelector("SELECT.listField OPTION[value='"+ setField.Id +"']").setAttribute("selected","selected");}catch(err){}
                             //try{mappingRow.querySelector("SELECT.userProperty OPTION[value='"+ userPropertyName +"']").setAttribute("selected","selected");}catch(err){}
                             try{mappingRow.querySelector("INPUT.userProperty").value = userPropertyName;}catch(err){}
+                            if ( userPropertyName.length > 0 ){
+                                var e = new Event("keyup");
+                                e.which = 16;
+                                mappingRow.querySelector("INPUT.userProperty").dispatchEvent(e);
+                            }
                         }
                     }
                 }
@@ -922,10 +920,18 @@ var picker = picker || {
             });
             if ( picker.isPageInEditMode() === false ) {
                 picker.showConfigButtons();
-                picker.ajax.getSettings(function(){
-                    picker.setupListeners();
-                    picker.populateCurrentSettings();
-                });
+                picker.ajax.checkIfSettingsListExists(function(){
+                    picker.log("Settings list already exists for dsMagic-picker JS API");
+                    picker.ajax.getSettings(function(){
+                        picker.log("Got dsMagic-picker settings for this page");
+                        picker.setupListeners();
+                        picker.populateCurrentSettings();
+                    });    
+                }, function(){
+                    picker.ajax.createSettingsList(function(){
+                        picker.log("Settings list created for dsMagic-picker JS API",true);
+                    });
+                })
             }
         });
     },23)
