@@ -1,5 +1,6 @@
 /*http://expertsoverlunch.com/sandbox/Lists/Tasks/NewForm.aspx*/
 /*http://expertsoverlunch.com/sandbox/Lists/PeopleAndGroupPickers/NewForm.aspx*/
+/*fails on calendar list: http://expertsoverlunch.com/sandbox/Lists/Meetings/NewForm.aspx */
 var pickerListeners = pickerListeners || [];
 var picker = picker || {
     instances: {},
@@ -7,6 +8,7 @@ var picker = picker || {
     pageWebParts: [],
     bDebug: false,
     editMode: false,
+    userCanEditSettings: false,
     log: function(message, bIgnoreDebugReq) {
         if ( typeof(bIgnoreDebugReq) === "undefined" ) { var bIgnoreDebugReq = false; }
         if ( picker.bDebug === true || bIgnoreDebugReq === true ) {
@@ -336,6 +338,13 @@ var picker = picker || {
             var restURL = _spPageContextInfo.webAbsoluteUrl +"/_api/web/lists/GetByTitle('dsMagic-pickers')";
             picker.ajax.read(restURL, function(x,d){
                 picker.log("Settings list exists",true);
+                picker.lists['dsMagic-pickers'] = d.d;
+                picker.ajax.getListPermissions("picker.lists['dsMagic-pickers']", function(settingsList){
+                    picker.log(settingsList.EffectiveBasePermissions,true);
+                    picker.ajax.checkForItemEditAddDelete('dsMagic-pickers', function(canEditAndAdd){
+                        picker.userCanEditSettings = canEditAndAdd;
+                    });
+                });
                 if ( typeof(fxExists) === "function" ){
                     fxExists();
                 }
@@ -345,8 +354,52 @@ var picker = picker || {
                     fxDoesNotExist();
                 }
             });
+        },
+		getListPermissions: function(strCaptureResultsIn, afterFx) {
+			var restURL = eval(strCaptureResultsIn+".__metadata.uri");
+			restURL += "?$select=EffectiveBasePermissions";
+			var fxCallback = function(xhr, data) {
+                eval(strCaptureResultsIn+".EffectiveBasePermissions = "+JSON.stringify(data.d.EffectiveBasePermissions)+";");
+                if ( typeof(afterFx) === "function" ){
+                    afterFx(eval(strCaptureResultsIn));
+                }
+            }
+			picker.ajax.read(restURL, fxCallback);
+        },
+        checkForItemEditAddDelete: function(restlistname, afterFx) {
+            // supposed to check like this:
+            // http://1.dsmagicsp.cloudappsportal.com/_api/web/lists(guid'd11a71ff-4170-4725-a804-9d76153d0ebf')/getusereffectivepermissions(@user)?@user=%27i%3A0%23%2Ew%7Cshakir%5Cjohn%27
+            // or for me
+            // http://1.dsmagicsp.cloudappsportal.com/_api/web/lists(guid'd11a71ff-4170-4725-a804-9d76153d0ebf')/getusereffectivepermissions(@user)?@user=%27i%3A0%23%2Ew%7Cschauer%5Cdaniel%27
+            // unencoded, the last parameter looks like this
+            // http://1.dsmagicsp.cloudappsportal.com/_api/web/lists(guid'd11a71ff-4170-4725-a804-9d76153d0ebf')/getusereffectivepermissions(@user)?@user='i:0#.w|shakir\john'
+            var up = new SP.BasePermissions();
+            up.set(SP.PermissionKind.viewListItems);
+            up.set(SP.PermissionKind.editListItems);
+            up.set(SP.PermissionKind.addListItems);
+            up.set(SP.PermissionKind.deleteListItems);
+            // High must be < up.$5_1 to correctly detect no access for anonymous users
+            // but must be > up.$5_1 to correctly detect appropriate access for daniel logged in
+            if (typeof(_spPageContextInfo.userId) === "undefined") {
+                if (picker.lists[restlistname].EffectiveBasePermissions.High < up.$5_1) {
+                    if (typeof(afterFx) === "function") { afterFx(true); }
+                    return true;
+                } else {
+                    if (typeof(afterFx) === "function") { afterFx(false); }
+                    return false;
+                }
+            } else {
+                if (picker.lists[restlistname].EffectiveBasePermissions.High > up.$5_1) {
+                    if (typeof(afterFx) === "function") { afterFx(true); }
+                    return true;
+                } else {
+                    if (typeof(afterFx) === "function") { afterFx(false); }
+                    return false;
+                }
+            }
         }
     },
+    lists: {},
     settings: [],
     userProperties: {},
     userGroups: {},
@@ -909,7 +962,8 @@ var picker = picker || {
             this.remove();
         });
     },
-    init: setTimeout(function(){
+    onSharePointReady: function(){
+        picker.log("SP.ClientContext detected via SP.SOD.executeFuc... fired dsU.onSharePointReady", true);
         picker.getUserProperties(function(){
             picker.getPageWebPartsAndFormFields(function(wp){
                 picker.log("webpart detected");
@@ -934,5 +988,14 @@ var picker = picker || {
                 })
             }
         });
-    },23)
+    },
+    onLoad: setTimeout(function() {
+        picker.log("dsMagic-picker Namespace loaded", true);
+        document.onreadystatechange = function() {
+            if (document.readyState === "complete") {
+                picker.log("document.onreadystatechange event fired and document.readyState is 'complete'", true);
+                SP.SOD.executeFunc('sp.js', 'SP.ClientContext', picker.onSharePointReady);
+            }
+        }
+    }, 23)
 }
