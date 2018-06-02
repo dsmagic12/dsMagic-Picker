@@ -343,11 +343,11 @@ var picker = picker || {
                     picker.log(settingsList.EffectiveBasePermissions,true);
                     picker.ajax.checkForItemEditAddDelete('dsMagic-pickers', function(canEditAndAdd){
                         picker.userCanEditSettings = canEditAndAdd;
+                        if ( typeof(fxExists) === "function" ){
+                            fxExists(canEditAndAdd);
+                        }
                     });
                 });
-                if ( typeof(fxExists) === "function" ){
-                    fxExists();
-                }
             }, undefined, function(){
                 picker.log("Settings list does not exist",true);
                 if ( typeof(fxDoesNotExist) === "function" ) {
@@ -778,6 +778,9 @@ var picker = picker || {
 
 
         }
+        if ( typeof(afterFx) === "function" ){
+            afterFx();
+        }
         //picker.populateCurrentSettings();
     },
     appendConfigStyles: function(){
@@ -973,14 +976,25 @@ var picker = picker || {
                 picker.appendConfigStyles();
             });
             if ( picker.isPageInEditMode() === false ) {
-                picker.showConfigButtons();
-                picker.ajax.checkIfSettingsListExists(function(){
+                picker.ajax.checkIfSettingsListExists(function(userCanEditSettings){
+                    if ( userCanEditSettings === true ) {
+                        picker.showConfigButtons(function(){
+                            picker.ajax.getSettings(function(){
+                                picker.log("Got dsMagic-picker settings for this page");
+                                picker.setupListeners();
+                                picker.populateCurrentSettings();
+                            });    
+                        });
+                    }
+                    else {
+                        picker.ajax.getSettings(function(){
+                            picker.log("Got dsMagic-picker settings for this page");
+                            picker.setupListeners();
+                            //picker.populateCurrentSettings();
+                        });
+                    }
                     picker.log("Settings list already exists for dsMagic-picker JS API");
-                    picker.ajax.getSettings(function(){
-                        picker.log("Got dsMagic-picker settings for this page");
-                        picker.setupListeners();
-                        picker.populateCurrentSettings();
-                    });    
+
                 }, function(){
                     picker.ajax.createSettingsList(function(){
                         picker.log("Settings list created for dsMagic-picker JS API",true);
