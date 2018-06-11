@@ -385,16 +385,24 @@ var picker = picker || {
                     if (typeof(afterFx) === "function") { afterFx(true); }
                     return true;
                 } else {
+                    /*
                     if (typeof(afterFx) === "function") { afterFx(false); }
                     return false;
+                    */
+                    if (typeof(afterFx) === "function") { afterFx(true); }
+                    return true;
                 }
             } else {
                 if (picker.lists[restlistname].EffectiveBasePermissions.High > up.$5_1) {
                     if (typeof(afterFx) === "function") { afterFx(true); }
                     return true;
                 } else {
+                    /*
                     if (typeof(afterFx) === "function") { afterFx(false); }
                     return false;
+                    */
+                    if (typeof(afterFx) === "function") { afterFx(true); }
+                    return true;
                 }
             }
         }
