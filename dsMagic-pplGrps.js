@@ -505,7 +505,7 @@ var pplGrps = pplGrps || {
         );
 
     },
-    getUserPropertiesByLoginName: function (loginName, afterFx) {
+    getUserPropertiesByLoginName: function (loginName, afterFx, pickerID, userKey) {
         pplGrps.userProperties = {};
         pplGrps.ajax.read(
             _spPageContextInfo.webAbsoluteUrl + "/_api/web/SiteUsers(@v)?@v='" + encodeURIComponent(loginName) + "'&$expand=Groups,UserId,Groups/Users",
@@ -514,10 +514,12 @@ var pplGrps = pplGrps || {
                 for (userProp in data.d) {
                     try {
                         pplGrps.userProperties[userProp] = data.d[userProp];
+                        try{pplGrps.instances[pickerID].users[userKey][userProp] = data.d[userProp];}catch(err){}
                         if (userProp === "Groups") {
                             if (typeof (data.d.Groups.results) !== "undefined") {
                                 for (var iG = 0; iG < data.d.Groups.results.length; iG++) {
                                     pplGrps.userGroups[data.d.Groups.results[iG].Title] = data.d.Groups.results[iG];
+                                    //try{pplGrps.instances[pickerID].groups[data.d.Groups.results[iG].Key] = data.d.Groups.results[iG];}catch(err){}
                                 }
                             }
                         }
@@ -525,12 +527,20 @@ var pplGrps = pplGrps || {
                         pplGrps.log("failed to capture user prop |" + userProp + "|");
                     }
                 }
+                if (typeof (afterFx) === "function") {
+                    if ( typeof(pplGrps.instances[pickerID]) !== "undefined" ){
+                        if ( typeof(pplGrps.instances[pickerID].users[userKey]) !== "undefined" ){
+                            afterFx(pplGrps.instances[pickerID].users[userKey]);
+                        }
+                    }
+                    else {
+                        afterFx(pplGrps.userProperties);
+                    }
+                }
             },
             function (xhr, data) {
                 pplGrps.log(data);
-                if (typeof (afterFx) === "function") {
-                    afterFx();
-                }
+
             },
             function () {
                 pplGrps.log("failed to get user properties");
@@ -617,18 +627,25 @@ var pplGrps = pplGrps || {
         if ( typeof(SPClientPeoplePicker) !== "undefined" ) {
             for (pickerControl in SPClientPeoplePicker.SPClientPeoplePickerDict) {
                 if (typeof (pplGrps.instances[SPClientPeoplePicker.SPClientPeoplePickerDict[pickerControl].TopLevelElementId]) === "undefined") {
-                    pplGrps.instances[SPClientPeoplePicker.SPClientPeoplePickerDict[pickerControl].TopLevelElementId] = {
+                    //pplGrps.instances[SPClientPeoplePicker.SPClientPeoplePickerDict[pickerControl].TopLevelElementId] = {
+                    pplGrps.instances[pickerControl] = {
                         spcsom: SPClientPeoplePicker.SPClientPeoplePickerDict[pickerControl],
                         fieldDisplayName: "",
                         fin: "",
                         fieldGUID: SPClientPeoplePicker.SPClientPeoplePickerDict[pickerControl].TopLevelElementId.replace("_$ClientPeoplePicker", ""),
-                        arrMapping: []
+                        arrMapping: [],
+                        users: {},
+                        groups: {}
                     };
-                    pplGrps.instances[SPClientPeoplePicker.SPClientPeoplePickerDict[pickerControl].TopLevelElementId].fieldGUID = pplGrps.instances[SPClientPeoplePicker.SPClientPeoplePickerDict[pickerControl].TopLevelElementId].fieldGUID.substr(pplGrps.instances[SPClientPeoplePicker.SPClientPeoplePickerDict[pickerControl].TopLevelElementId].fieldGUID.indexOf("_") + 1, 38);
-                    var pickerFormField = pplGrps.findFormField("TopLevelElementId", SPClientPeoplePicker.SPClientPeoplePickerDict[pickerControl].TopLevelElementId);
+                    //pplGrps.instances[SPClientPeoplePicker.SPClientPeoplePickerDict[pickerControl].TopLevelElementId].fieldGUID = pplGrps.instances[SPClientPeoplePicker.SPClientPeoplePickerDict[pickerControl].TopLevelElementId].fieldGUID.substr(pplGrps.instances[SPClientPeoplePicker.SPClientPeoplePickerDict[pickerControl].TopLevelElementId].fieldGUID.indexOf("_") + 1, 38);
+                    pplGrps.instances[pickerControl].fieldGUID = pplGrps.instances[pickerControl].fieldGUID.substr(pplGrps.instances[pickerControl].fieldGUID.indexOf("_") + 1, 38);
+                    //var pickerFormField = pplGrps.findFormField("TopLevelElementId", SPClientPeoplePicker.SPClientPeoplePickerDict[pickerControl].TopLevelElementId);
+                    var pickerFormField = pplGrps.findFormField("TopLevelElementId", pickerControl);
                     try {
-                        pplGrps.instances[SPClientPeoplePicker.SPClientPeoplePickerDict[pickerControl].TopLevelElementId].fieldDisplayName = pickerFormField.Title;
-                        pplGrps.instances[SPClientPeoplePicker.SPClientPeoplePickerDict[pickerControl].TopLevelElementId].fin = pickerFormField.Name;
+                        //pplGrps.instances[SPClientPeoplePicker.SPClientPeoplePickerDict[pickerControl].TopLevelElementId].fieldDisplayName = pickerFormField.Title;
+                        pplGrps.instances[pickerControl].fieldDisplayName = pickerFormField.Title;
+                        //pplGrps.instances[SPClientPeoplePicker.SPClientPeoplePickerDict[pickerControl].TopLevelElementId].fin = pickerFormField.Name;
+                        pplGrps.instances[pickerControl].fin = pickerFormField.Name;
                     } catch (err) {}
                 }
             }
@@ -831,7 +848,7 @@ var pplGrps = pplGrps || {
                 pplGrps.log("Save button clicked");
                 pplGrps.log(e);
                 pplGrps.log(this);
-                var popupWrapper = pplGrps.parentsUntilMatchingSelector(this, ".pickerConfigPopup");
+                var popupWrapper = pplGrps.parentsUntilMatchingSelector(this, ".pplGrpsConfigPopup");
                 var fieldName = popupWrapper.querySelector(".configForField").innerText;
                 var saveConfig = {};
                 saveConfig.fieldDisplayName = fieldName;
@@ -975,13 +992,26 @@ var pplGrps = pplGrps || {
         elemStyles.innerHTML = arrStyles.join("");
         document.head.appendChild(elemStyles);
     },
+    parentsLoop: {
+        current: null,
+        parent: null,
+        lastParent: null,
+        selector: "",
+        breakCounter: 0
+    },
     parentsUntilMatchingSelector: function (htmlElement, selector) {
+        pplGrps.parentsLoop.current = htmlElement;
         var parent = htmlElement.parentElement;
         var lastParent = parent;
         var iBreak = 0;
-        while (iBreak < 100 && parent.querySelectorAll(selector).length < 1) {
+        pplGrps.parentsLoop.selector = selector;
+        while (iBreak < 100 && parent.querySelectorAll(selector).length < 1 && parent.tagName !== "BODY" ) {
+            pplGrps.parentsLoop.breakCounter = iBreak;
+            pplGrps.parentsLoop.selector = selector;
             lastParent = parent;
+            pplGrps.parentsLoop.lastParent = parent;
             parent = parent.parentElement;
+            pplGrps.parentsLoop.parent = parent.parentElement;
             iBreak++;
         }
         if (parent.querySelectorAll(selector).length > 0) {
@@ -992,82 +1022,110 @@ var pplGrps = pplGrps || {
     },
     setupListeners: function () {
         for (var iL = 0; iL < pplGrpsListeners.length; iL++) {
+            pplGrps.log("configuring listener |"+ iL +"|",true);
             var listener = pplGrpsListeners[iL];
             var pickerFormField = pplGrps.findFormField("Title", listener.fieldDisplayName);
             if (!pickerFormField === false) {
-                var pickerTopLevelElementId = pickerFormField.TopLevelElementId;
-                var pickerInstance = pplGrps.instances[pickerTopLevelElementId];
                 if (listener.bCaptureProfileDetails === true) {
-                    pickerInstance.spcsom.OnUserResolvedClientScript = function (pickerId, arrUsers) {
-                        pplGrps.log(pickerId);
-                        pplGrps.log(arrUsers);
-                        if (pickerInstance.spcsom.HasResolvedUsers() === true) {
-                            for (var iUser = 0; iUser < arrUsers.length; iUser++) {
-                                pplGrps.log(arrUsers[iUser]);
-                                pplGrps.getUserPropertiesByLoginName(arrUsers[iUser].Key, function () {
-                                    for (var iMapping = 0; iMapping < listener.arrMapping.length; iMapping++) {
-                                        var setField = pplGrps.findFormField("Name", listener.arrMapping[iMapping].fin);
-                                        pplGrps.log(setField);
-                                        var setFieldElement = document.querySelector("[id*='" + setField.Id + "']");
-                                        pplGrps.log(setFieldElement);
-                                        pplGrps.log(listener.arrMapping[iMapping].userProperty);
-                                        var setUserProperty = undefined,
-                                            splitUserProperty = undefined,
-                                            setUserSubProperty = undefined;
-                                        try {
-                                            if (listener.arrMapping[iMapping].userProperty.indexOf("|") >= 0) {
-                                                splitUserProperty = listener.arrMapping[iMapping].userProperty.split("|");
-                                                setUserProperty = eval(splitUserProperty[0]);
-                                                setUserSubProperty = splitUserProperty[1];
-                                            } else {
-                                                setUserProperty = eval(listener.arrMapping[iMapping].userProperty);
+                    var fxGenResolvedScript = function(oListener, oPickerFormField){
+                        pplGrps.instances[oPickerFormField.TopLevelElementId].spcsom.OnUserResolvedClientScript = function (pickerControlId, arrUsers) {
+                            var pickerTopLevelElementId = pickerControlId;
+                            var pickerInstance = pplGrps.instances[pickerTopLevelElementId];
+                            pplGrps.log("pplGrps.instances["+pickerControlId+"].spcsom.OnUserResolvedClientScript function fired!");
+                            pplGrps.log("pplGrps.instances["+pickerControlId+"].spcsom.HasResolvedUsers() = |"+ pickerInstance.spcsom.HasResolvedUsers() +"|");
+                            pplGrps.log("pplGrps.instances["+pickerControlId+"].spcsom.GetAllUserInfo().length = |"+ pickerInstance.spcsom.GetAllUserInfo().length +"|");
+                            pplGrps.log(arrUsers);
+                            if (pickerInstance.spcsom.HasResolvedUsers() === true) {
+                                for (var iUser = 0; iUser < arrUsers.length; iUser++) {
+                                    /* capture the user profile properties exposed via the person/group picker control */
+                                    pickerInstance.users[arrUsers[iUser].Key] = arrUsers[iUser];
+                                    pplGrps.log(arrUsers[iUser]);
+                                    /* make a rest call to request user properties from the user's sharepoint profile */
+                                    pplGrps.getUserPropertiesByLoginName(arrUsers[iUser].Key, function (oUser) {
+                                        pplGrps.log(oUser);
+                                        for (var iMapping = 0; iMapping < oListener.arrMapping.length; iMapping++) {
+                                            var setField = pplGrps.findFormField("Name", oListener.arrMapping[iMapping].fin);
+                                            pplGrps.log(setField);
+                                            var setFieldElement = document.querySelector("[id*='" + setField.Id + "']");
+                                            pplGrps.log(setFieldElement);
+                                            pplGrps.log(setFieldElement.tagName);
+                                            pplGrps.log(setFieldElement.className);
+                                            pplGrps.log(oListener.arrMapping[iMapping].userProperty);
+                                            var setUserProperty = undefined,
+                                                splitUserProperty = undefined,
+                                                setUserSubProperty = undefined;
+                                            try {
+                                                if (oListener.arrMapping[iMapping].userProperty.indexOf("|") >= 0) {
+                                                    splitUserProperty = oListener.arrMapping[iMapping].userProperty.split("|");
+                                                    setUserProperty = eval(splitUserProperty[0]);
+                                                    setUserSubProperty = splitUserProperty[1];
+                                                } else {
+                                                    setUserProperty = eval(oListener.arrMapping[iMapping].userProperty);
+                                                }
+                                            } catch (err) {}
+                                            pplGrps.log(setUserProperty);
+                                            pplGrps.log(splitUserProperty);
+                                            pplGrps.log(setUserSubProperty);
+                                            /* capture the sharepoint user profile details retrieved via rest under this picker instance's user object */
+                                            for ( userProp in oUser ){
+                                                pickerInstance.users[oUser.LoginName][userProp] = oUser[userProp];
                                             }
-                                        } catch (err) {}
-                                        try {
-                                            if (typeof (setUserProperty) === "object") {
-                                                if (typeof (setUserProperty.length) !== "undefined" && setUserProperty.length > 0) {
-                                                    pplGrps.log("Setting userproperty mapping by looping through the referenced JS array");
-                                                    pplGrps.log(setUserProperty);
-                                                    for (var iG = 0; iG < setUserProperty.length; iG++) {
-                                                        if (typeof (setUserSubProperty) !== "undefined") {
-                                                            pplGrps.log("Setting userproperty mapping by looping through sub-array");
-                                                            var subLoop = eval("setUserProperty[" + iG + "]." + setUserSubProperty);
-                                                            pplGrps.log(subLoop);
-                                                            for (var iU = 0; iU < subLoop.length; iU++) {
-                                                                pplGrps.log("pplGrps adding person or group to field with fin |" + listener.arrMapping[iMapping].fin + "|", true);
-                                                                SPClientPeoplePicker.SPClientPeoplePickerDict[pplGrps.findFormField("Name", listener.arrMapping[iMapping].fin).TopLevelElementId].AddUserKeys(subLoop[iU].LoginName);
+                                            try {
+                                                if (typeof (setUserProperty) === "object") {
+                                                    if (typeof (setUserProperty.length) !== "undefined" && setUserProperty.length > 0) {
+                                                        pplGrps.log("Setting userproperty mapping by looping through the referenced JS array");
+                                                        pplGrps.log(setUserProperty);
+                                                        for (var iG = 0; iG < setUserProperty.length; iG++) {
+                                                            if (typeof (setUserSubProperty) !== "undefined") {
+                                                                pplGrps.log("Setting userproperty mapping by looping through sub-array");
+                                                                var subLoop = eval("setUserProperty[" + iG + "]." + setUserSubProperty);
+                                                                pplGrps.log(subLoop);
+                                                                for (var iU = 0; iU < subLoop.length; iU++) {
+                                                                    pplGrps.log("pplGrps adding person or group to field with fin |" + oListener.arrMapping[iMapping].fin + "|", true);
+                                                                    /*SPClientPeoplePicker.SPClientPeoplePickerDict[pplGrps.findFormField("Name", oListener.arrMapping[iMapping].fin).TopLevelElementId].AddUserKeys(subLoop[iU].LoginName);*/
+                                                                    //pickerInstance.spcsom.AddUserKeys(setUserProperty[iG].LoginName);
+                                                                    pplGrps.instances[pplGrps.findFormField("Name", oListener.arrMapping[iMapping].fin).TopLevelElementId].spcsom.AddUserKeys(subLoop[iU].LoginName);
+                                                                }
+
+                                                            } else {
+                                                                pplGrps.log("pplGrps adding person or group to field with fin |" + oListener.arrMapping[iMapping].fin + "|", true);
+                                                                /*SPClientPeoplePicker.SPClientPeoplePickerDict[pplGrps.findFormField("Name", oListener.arrMapping[iMapping].fin).TopLevelElementId].AddUserKeys(setUserProperty[iG].LoginName);*/
+                                                                pplGrps.instances[pplGrps.findFormField("Name", oListener.arrMapping[iMapping].fin).TopLevelElementId].spcsom.AddUserKeys(setUserProperty[iG].LoginName);
                                                                 //pickerInstance.spcsom.AddUserKeys(setUserProperty[iG].LoginName);
                                                             }
-
-                                                        } else {
-                                                            pplGrps.log("pplGrps adding person or group to field with fin |" + listener.arrMapping[iMapping].fin + "|", true);
-                                                            SPClientPeoplePicker.SPClientPeoplePickerDict[pplGrps.findFormField("Name", listener.arrMapping[iMapping].fin).TopLevelElementId].AddUserKeys(setUserProperty[iG].LoginName);
-                                                            //pickerInstance.spcsom.AddUserKeys(setUserProperty[iG].LoginName);
                                                         }
                                                     }
                                                 }
-                                            }
-                                        } catch (err) {}
-                                        if (typeof (setUserProperty) !== "object") {
-                                            pplGrps.log("pplGrps capturing simple user profile property value in form field with fin |" + listener.arrMapping[iMapping].fin + "|");
-                                            if (setFieldElement.tagName === "INPUT") {
-                                                setFieldElement.value = eval(listener.arrMapping[iMapping].userProperty);
-                                            } else if (setFieldElement.tagName === "SELECT") {
-                                                if (!setFieldElement.getAttribute("multiple") === true) {
-                                                    /* single value select control */
-                                                    setFieldElement.value = eval(listener.arrMapping[iMapping].userProperty);
-                                                } else {
-                                                    /* multivalue select control */
+                                            } catch (err) {}
+                                            if (typeof (setUserProperty) !== "object") {
+                                                pplGrps.log("pplGrps capturing simple user profile property value in form field with fin |" + oListener.arrMapping[iMapping].fin + "|");
+                                                if (setFieldElement.tagName === "INPUT") {
+                                                    setFieldElement.value = eval(oListener.arrMapping[iMapping].userProperty);
+                                                } 
+                                                else if (setFieldElement.tagName === "SELECT") {
+                                                    if (!setFieldElement.getAttribute("multiple") === true) {
+                                                        /* single value select control */
+                                                        setFieldElement.value = eval(oListener.arrMapping[iMapping].userProperty);
+                                                    } else {
+                                                        /* multivalue select control */
+                                                    }
+                                                } 
+                                                else if (setFieldElement.tagName === "TEXTAREA") {
+                                                    setFieldElement.value = eval(oListener.arrMapping[iMapping].userProperty);
                                                 }
-                                            } else if (setFieldElement.tagName === "TEXTAREA") {
-                                                setFieldElement.value = eval(listener.arrMapping[iMapping].userProperty);
+                                                else if (setFieldElement.tagName === "DIV" && setFieldElement.className.indexOf("sp-peoplepicker-topLevel") >= 0 ) {
+                                                    /* picker */
+                                                    pplGrps.instances[setFieldElement.id].spcsom.AddUserKeys(eval(oListener.arrMapping[iMapping].userProperty));
+                                                }
                                             }
                                         }
-                                    }
-                                });
+                                    });
+                                }
                             }
                         }
                     }
+                    fxGenResolvedScript(listener, pickerFormField);
+                    pplGrps.log("set instance's spcsom.OnUserResolvedClientScript for |"+ pickerFormField.TopLevelElementId +"|",true);
                 }
             }
         }
@@ -1080,6 +1138,7 @@ var pplGrps = pplGrps || {
             if (!pickerFormField === false) {
                 var pickerTopLevelElementId = pickerFormField.TopLevelElementId;
                 var pickerInstance = pplGrps.instances[pickerTopLevelElementId];
+                pickerInstance.arrMapping = listener.arrMapping;
                 var pickerConfigWrapper = document.getElementById(pickerTopLevelElementId + "_configWrapper");
                 if (listener.bCaptureProfileDetails === true) {
                     var pickerConfigMappingTBODY = document.getElementById(pickerTopLevelElementId + "_configMappingRowsWrapper");
