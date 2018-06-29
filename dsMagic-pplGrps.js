@@ -566,6 +566,7 @@ var pplGrps = pplGrps || {
             try {
                 wp.guid = document.getElementById("WebPartWPQ" + wp.num).getAttribute("webpartid");
             } catch (err) {}
+            pplGrps.log(wp,true);
             pplGrps.pageWebParts.push(wp);
             /* check if we have a WPQ#FormCtx object defined for this web part; then loop thru its fields and capture them in pplGrps.formFields */
             try {
@@ -577,16 +578,17 @@ var pplGrps = pplGrps || {
                     pplGrps.formFields["WPQ" + wp.num + "FormCtx"][formField] = wpCTX.ListSchema[formField];
                 }
             } catch (err) {
-                try {
-                    console.log("WebPart |" + wp.num + "| is not a standard form");
-                } catch (err) {}
+                pplGrps.log("WebPart |" + wp.num + "| is not a standard form",true);
                 if (typeof (pplGrps.formFields["dsWPQ"+webPart+"FormCtx"]) === "undefined" ) {
                     pplGrps.formFields["dsWPQ"+webPart+"FormCtx"] = {}
                 }
-                var collFormFields = document.querySelectorAll(".ms-formbody");
+                var collFormFields = collWPs[webPart].querySelectorAll(".ms-formbody");
+                pplGrps.log("WebPart |" + wp.num + "| contains "+ collFormFields.length,true);
                 for ( var iField = 0; iField < collFormFields.length; iField++ ){
                     var oField = collFormFields[iField];
+                    pplGrps.log(oField);
                     var firstComment = oField.innerHTML.substr(0,oField.innerHTML.indexOf("-->"));
+                    pplGrps.log(firstComment);
                     var FieldName = firstComment.substr(firstComment.indexOf("FieldName=")+11,200);
                     FieldName = FieldName.substr(0,FieldName.indexOf("\n")-1);
                     var FieldInternalName = firstComment.substr(firstComment.indexOf("FieldInternalName=")+19,200);
@@ -594,7 +596,7 @@ var pplGrps = pplGrps || {
                     var FieldType = firstComment.substr(firstComment.indexOf("FieldType=")+11,200);
                     FieldType = FieldType.substr(0,FieldType.indexOf("\n")-1);
                     /*pplGrps.log(FieldName +"|"+ FieldInternalName +"|"+ FieldType,true);*/
-                    pplGrps.formFields["dsWPQ"+webPart+"FormCtx"][FieldName] = {
+                    pplGrps.formFields["dsWPQ"+webPart+"FormCtx"][FieldInternalName] = {
                         Description: "",
                         Direction: "none",
                         FieldType: FieldType,
@@ -608,9 +610,74 @@ var pplGrps = pplGrps || {
                         Title: FieldName,
                         Type: FieldType
                     };
+                    pplGrps.log(pplGrps.formFields["dsWPQ"+webPart+"FormCtx"][FieldInternalName]);
                     if ( FieldType.indexOf("User") >= 0 || FieldType.indexOf("Group") >= 0 ){
                         /* is picker */
+                        pplGrps.formFields["dsWPQ"+webPart+"FormCtx"][FieldInternalName].Id = oField.querySelectorAll(".ms-usereditor")[0].id;
+                        pplGrps.formFields["dsWPQ"+webPart+"FormCtx"][FieldInternalName].TopLevelElementId = oField.querySelectorAll("[id$='_UserField_upLevelDiv']")[0].id;
+                        
+                        var fxSetOnKeyUp = function(controlID){
+                            pplGrps.log("Setup event listener on picker hidden input onchange for control |"+ controlID+"|",true);
+                            document.getElementById(controlID).onkeyup = function onkeyup(event) {
+                                pplGrps.log(controlID);
+                                pplGrps.log(event);
+                                //var keyboardEvent = onKeyUpRw(controlID.replace("_upLevelDiv",""));
+                                //pplGrps.log(keyboardEvent,true);
+                                //pplGrps.instances[controlID].spcsom.OnUserResolvedClientScript(controlID, pplGrps.instances[controlID].spcsom.GetAllUserInfo())
+                                if ( event.which === 13 ){
+                                    // user pressed 'enter'
+                                    setTimeout(function(){
+                                        pplGrps.instances[controlID].spcsom.OnUserResolvedClientScript(controlID, pplGrps.instances[controlID].spcsom.GetAllUserInfo())
+                                    },2000);
+                                }
+                                else if ( event.which === 186 ){
+                                    // user pressed 'semicolon'
+                                    setTimeout(function(){
+                                        pplGrps.instances[controlID].spcsom.OnUserResolvedClientScript(controlID, pplGrps.instances[controlID].spcsom.GetAllUserInfo())
+                                    },2000);
+                                }
+                                //return keyboardEvent;
+                                return event;
+                            }
+                        };
+                        fxSetOnKeyUp(pplGrps.formFields["dsWPQ"+webPart+"FormCtx"][FieldInternalName].TopLevelElementId);
 
+                        /*
+                        var fxSetOnChange = function(controlID){
+                            document.getElementById(controlID).onchange = function onchange(event) {
+                                pplGrps.log("onchange",true);
+                                pplGrps.log(controlID,true);
+                                pplGrps.log(event,true);
+                                //pplGrps.instances[controlID].spcsom.OnUserResolvedClientScript(controlID, pplGrps.instances[controlID].spcsom.GetAllUserInfo())
+                                updateControlValue(controlID.replace("_upLevelDiv",""));
+                            }
+                        };
+                        fxSetOnChange(pplGrps.formFields["dsWPQ"+webPart+"FormCtx"][FieldInternalName].TopLevelElementId);
+                        */
+
+                        var fxSetOnBlur = function(controlID){
+                            document.getElementById(controlID).onblur = function onblur(event) {
+                                pplGrps.log("onblur",true);
+                                pplGrps.log(controlID);
+                                pplGrps.log(event);
+                                //pplGrps.instances[controlID].spcsom.OnUserResolvedClientScript(controlID, pplGrps.instances[controlID].spcsom.GetAllUserInfo())
+                            }
+                        };
+                        fxSetOnBlur(pplGrps.formFields["dsWPQ"+webPart+"FormCtx"][FieldInternalName].TopLevelElementId);
+
+                        /*
+                        var fxSetHiddenInputOnChange = function(controlID){
+                            pplGrps.log("Setup event listener on picker hidden input onchange for control |"+ controlID+"|",true);
+                            //document.getElementById(controlID.replace("_UserField_upLevelDiv","_UserField_hiddenSpanData")).addEventListener("change",function(event) {
+                            document.getElementById(controlID.replace("_UserField_upLevelDiv","_UserField_hiddenSpanData")).onchange = function onchange(event) {
+                                pplGrps.log("onchange",true);
+                                pplGrps.log(controlID.replace("_UserField_upLevelDiv","_UserField_hiddenSpanData"));
+                                pplGrps.log(event);
+                                //pplGrps.instances[controlID].spcsom.OnUserResolvedClientScript(controlID, pplGrps.instances[controlID].spcsom.GetAllUserInfo())
+                            }
+                        };
+                        fxSetHiddenInputOnChange(pplGrps.formFields["dsWPQ"+webPart+"FormCtx"][FieldInternalName].TopLevelElementId);
+                        */
                     }
                     /*pplGrps.formFields["dsWPQ"+webPart+"FormCtx"][oField.innerHTML.substr(0,)]*/
                 }
@@ -669,31 +736,73 @@ var pplGrps = pplGrps || {
                                 HasResolvedUsers: function(){
                                     return pplGrps.legacyInstances[this.formFieldId].formField.querySelectorAll(".ms-entity-resolved").length > 0
                                 },
-                                OnUserResolvedClientScript: function(controlId, arrEntries){},
+                                OnUserResolvedClientScript: function(controlId, arrEntries){
+                                    pplGrps.log("OnUserResolvedClientScript fired",true);
+                                    pplGrps.log(controlId,true);
+                                    pplGrps.log(arrEntries,true);
+                                    
+                                },
                                 AddUserKeys: function(loginName){
                                     pplGrps.legacyInstances[this.formFieldId].formField.innerText = loginName;
+                                    pplGrps.legacyInstances[this.formFieldId].spcsom.checkNames();
+                                    /*
                                     var fieldCheckNames = document.getElementById(this.formFieldId.replace("upLevelDiv","checkNames"));
                                     fieldCheckNames.click();
+                                    */
                                 },
                                 GetAllUserInfo: function(){
-                                    var collResolved = elemPicker.querySelectorAll(".ms-entity-resolved");
+                                    var collResolved = document.querySelectorAll("[id='"+this.formFieldId+"'] .ms-entity-resolved");
                                     var arrReturn = [];
                                     for ( var iR = 0; iR < collResolved.length; iR++ ){
                                         arrReturn.push({
                                             "AccountName":collResolved[iR].id.substr(4,collResolved[iR].id.length-4),
                                             "LoginName": collResolved[iR].getAttribute("title"),
                                             "Name": collResolved[iR].childNodes[0],
-                                            "EntityData":  collResolved[iR].childNodes[0].childNodes[0]
+                                            "EntityData":  collResolved[iR].childNodes[0].childNodes[0],
+                                            "DisplayText": collResolved[iR].childNodes[0].getAttribute("displaytext"),
+                                            "Key": collResolved[iR].id.substr(4,collResolved[iR].id.length-4),
+                                            "IsResolved": true
                                         });
                                     }
+                                    /*
+                                    getting this sent
+                                    http://expertsoverlunch.com/sandbox/_api/web/SiteUsers(@v)?@v=%27expertsoverlunchMP%3ADaniel%27&$expand=Groups,UserId,Groups/Users
+                                    should look like this
+                                    http://expertsoverlunch.com/sandbox/_api/web/SiteUsers(@v)?@v=%27i%3A0%23.f%7Cexpertsoverlunchmp%7Cmarcus%27&$expand=Groups,UserId,Groups/Users
+                                    */
                                     return arrReturn;
+                                },
+                                checkNames: function onclick(event){
+                                    //pplGrps.log(event,true);
+                                    pplGrps.log(this.formFieldId,true);
+                                    document.getElementById(this.formFieldId.replace("_UserField_upLevelDiv","_UserField_checkNames")).click();
+                                    /*
+                                    if(!ValidatePickerControl('ctl00_ctl26_g_e1c47bb7_99a4_482b_9c13_94ae882b8a90_ctl00_ctl05_ctl09_ctl00_ctl00_ctl04_ctl00_ctl00_UserField')){ ShowValidationError(); return false;} 
+                                    var arg=getUplevel('ctl00_ctl26_g_e1c47bb7_99a4_482b_9c13_94ae882b8a90_ctl00_ctl05_ctl09_ctl00_ctl00_ctl04_ctl00_ctl00_UserField'); 
+                                    var ctx='ctl00_ctl26_g_e1c47bb7_99a4_482b_9c13_94ae882b8a90_ctl00_ctl05_ctl09_ctl00_ctl00_ctl04_ctl00_ctl00_UserField';
+                                    EntityEditorSetWaitCursor(ctx);
+                                    WebForm_DoCallback(
+                                         'ctl00$ctl26$g_e1c47bb7_99a4_482b_9c13_94ae882b8a90$ctl00$ctl05$ctl09$ctl00$ctl00$ctl04$ctl00$ctl00$UserField',
+                                        arg,
+                                        EntityEditorHandleCheckNameResult,
+                                        ctx,
+                                        EntityEditorHandleCheckNameError,
+                                        true
+                                    );
+                                    return false;
+                                    */
+                                    //setTimeout(function(){
+                                        pplGrps.legacyInstances[this.formFieldId].spcsom.OnUserResolvedClientScript(this.formFieldId, pplGrps.legacyInstances[this.formFieldId].spcsom.GetAllUserInfo());
+                                    //},123);
                                 }
                             },
                             fieldDisplayName: pplGrps.pickerControls[iPCIndex-1].Title,
                             fin: pplGrps.pickerControls[iPCIndex-1].InternalName,
                             fieldGUID: pplGrps.pickerControls[iPCIndex-1].Id,
                             arrMapping: [],
-                            formField: elem
+                            formField: elem,
+                            users: {},
+                            groups: {}
                         }
                         pplGrps.instances[elem.id] = pplGrps.legacyInstances[elem.id];
                     }, 
@@ -1031,11 +1140,16 @@ var pplGrps = pplGrps || {
                         pplGrps.instances[oPickerFormField.TopLevelElementId].spcsom.OnUserResolvedClientScript = function (pickerControlId, arrUsers) {
                             var pickerTopLevelElementId = pickerControlId;
                             var pickerInstance = pplGrps.instances[pickerTopLevelElementId];
-                            pplGrps.log("pplGrps.instances["+pickerControlId+"].spcsom.OnUserResolvedClientScript function fired!");
-                            pplGrps.log("pplGrps.instances["+pickerControlId+"].spcsom.HasResolvedUsers() = |"+ pickerInstance.spcsom.HasResolvedUsers() +"|");
+                            pplGrps.log("pplGrps.instances["+pickerControlId+"].spcsom.OnUserResolvedClientScript function fired!",true);
+                            pplGrps.log("pplGrps.instances["+pickerControlId+"].spcsom.HasResolvedUsers() = |"+ pickerInstance.spcsom.HasResolvedUsers() +"|",true);
                             pplGrps.log("pplGrps.instances["+pickerControlId+"].spcsom.GetAllUserInfo().length = |"+ pickerInstance.spcsom.GetAllUserInfo().length +"|");
-                            pplGrps.log(arrUsers);
-                            if (pickerInstance.spcsom.HasResolvedUsers() === true) {
+                            pplGrps.log(arrUsers,true);
+                            pplGrps.log(pickerInstance.spcsom.GetAllUserInfo());
+                            if (pickerInstance.spcsom.HasResolvedUsers() === false) {
+                                pplGrps.log("pplGrps.instances["+pickerControlId+"] has no resolved users!",true);
+                                
+                            }
+                            else if (pickerInstance.spcsom.HasResolvedUsers() === true) {
                                 for (var iUser = 0; iUser < arrUsers.length; iUser++) {
                                     /* capture the user profile properties exposed via the person/group picker control */
                                     pickerInstance.users[arrUsers[iUser].Key] = arrUsers[iUser];
@@ -1045,7 +1159,7 @@ var pplGrps = pplGrps || {
                                         pplGrps.log(oUser);
                                         for (var iMapping = 0; iMapping < oListener.arrMapping.length; iMapping++) {
                                             var setField = pplGrps.findFormField("Name", oListener.arrMapping[iMapping].fin);
-                                            pplGrps.log(setField);
+                                            pplGrps.log(setField,true);
                                             var setFieldElement = document.querySelector("[id*='" + setField.Id + "']");
                                             pplGrps.log(setFieldElement);
                                             pplGrps.log(setFieldElement.tagName);
@@ -1098,7 +1212,8 @@ var pplGrps = pplGrps || {
                                                 }
                                             } catch (err) {}
                                             if (typeof (setUserProperty) !== "object") {
-                                                pplGrps.log("pplGrps capturing simple user profile property value in form field with fin |" + oListener.arrMapping[iMapping].fin + "|");
+                                                pplGrps.log("pplGrps capturing simple user profile property value in form field with fin |" + oListener.arrMapping[iMapping].fin + "|",true);
+                                                pplGrps.log(setFieldElement,true);
                                                 if (setFieldElement.tagName === "INPUT") {
                                                     setFieldElement.value = eval(oListener.arrMapping[iMapping].userProperty);
                                                 } 
@@ -1113,9 +1228,14 @@ var pplGrps = pplGrps || {
                                                 else if (setFieldElement.tagName === "TEXTAREA") {
                                                     setFieldElement.value = eval(oListener.arrMapping[iMapping].userProperty);
                                                 }
-                                                else if (setFieldElement.tagName === "DIV" && setFieldElement.className.indexOf("sp-peoplepicker-topLevel") >= 0 ) {
+                                                else if (setFieldElement.tagName === "DIV" /*&& setFieldElement.className.indexOf("sp-peoplepicker-topLevel") >= 0*/ ) {
                                                     /* picker */
                                                     pplGrps.instances[setFieldElement.id].spcsom.AddUserKeys(eval(oListener.arrMapping[iMapping].userProperty));
+                                                    
+                                                }
+                                                else if (setFieldElement.tagName === "SPAN" && setFieldElement.className.indexOf("ms-usereditor") >= 0 ) {
+                                                    
+                                                    pplGrps.legacyInstances[setFieldElement.id+"_upLevelDiv"].spcsom.AddUserKeys(eval(oListener.arrMapping[iMapping].userProperty));
                                                 }
                                             }
                                         }
