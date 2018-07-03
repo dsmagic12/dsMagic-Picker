@@ -11,6 +11,650 @@ var pplGrps = pplGrps || {
     bDebug: false,
     editMode: false,
     userCanEditSettings: false,
+    currentSettings: {},
+    listFields: [],
+    SPFieldTypes: {
+        fromFormBody: function(elemMsFormBody){
+            var firstComment = elemMsFormBody.innerHTML.substr(0,elemMsFormBody.innerHTML.indexOf("-->"));
+            pplGrps.log(firstComment,true);
+            var FieldName = firstComment.substr(firstComment.indexOf("FieldName=")+11,200);
+            FieldName = FieldName.substr(0,FieldName.indexOf("\n")-1);
+            var FieldInternalName = firstComment.substr(firstComment.indexOf("FieldInternalName=")+19,200);
+            FieldInternalName = FieldInternalName.substr(0,FieldInternalName.indexOf("\n")-1);
+            var FieldType = firstComment.substr(firstComment.indexOf("FieldType=")+11,200);
+            FieldType = FieldType.substr(0,FieldType.indexOf("\n")-1);
+            pplGrps.log(FieldName +"|"+ FieldInternalName +"|"+ FieldType,true);
+            var fieldGUID = "";
+            try{
+                fieldGUID = WPQ2FormCtx.ListSchema[FieldInternalName].Id;
+            }
+            catch(err){
+                fieldGUID = pplGrps.listFields.filter(function(field){ return field.StaticName === FieldInternalName; })[0].Id;
+            }
+            var oSPField = new pplGrps.SPFieldTypes[FieldType](FieldInternalName, fieldGUID, FieldName);
+            oSPField.elemMain = oSPField.object("control");
+            pplGrps.log(oSPField,true);
+        },
+        getListFields: function(listGUID, fxCallback){
+            /*pplGrps.SPFieldTypes.getListFields(_spPageContextInfo.pageListId.replace("{","").replace("}",""))*/
+            pplGrps.ajax.read(
+                _spPageContextInfo.webAbsoluteUrl+"/_api/web/lists(guid'"+ listGUID +"')/Fields", 
+                function(x,d){
+                    for ( var iR = 0; iR < d.d.results.length; iR++ ){
+                        var result = d.d.results[iR];
+                        result.listGUID = listGUID;
+                        pplGrps.listFields.push(result);
+                    }
+                    if ( typeof(fxCallback) === 'function' ) { 
+                        fxCallback(pplGrps.listFields); 
+                    }
+                },
+                undefined,
+                function(){
+                    pplGrps.log("Failed");
+                },
+                "json"
+            );
+        },
+        /*http://expertsoverlunch.com/sandbox/Lists/Field%20Types%20Demo/NewForm.aspx*/
+        SPFieldText: function(fin, guid, displayName){
+            return {
+                fin: fin,
+                guid: guid,
+                fieldDisplayName: displayName,
+                fieldType: "SPFieldText",
+                fieldSubType: "",
+                selectors: {
+                    control: "INPUT[type='text'][id='"+ fin +"_"+ guid +"_$TextField']"
+                },
+                elemMain: null,
+                get: function(){
+                    return this.elemMain.value
+                },
+                set: function(newValue){
+                    this.elemMain.value = newValue;
+                },
+                object: function(selName){
+                    return document.querySelector(this.selectors[selName])
+                }
+            }
+        },
+        SPFieldDateTime: {
+            dateOnly: function(fin,guid,displayName){
+                return {
+                    fin: fin,
+                    guid: guid,
+                    fieldDisplayName: displayName,
+                    fieldType: "SPFieldDateTime",
+                    fieldSubType: "DateOnly",
+                    selectors: {
+                        control: "INPUT[id='"+ fin +"_"+ guid +"_$DateTimeFieldDate']",
+                        picker: "IMG[id='"+ fin +"_"+ guid +"_$DateTimeFieldDateDatePickerImage']"
+                    },
+                    elemMain: document.querySelector(this.selectors.control),
+                    elemPicker: document.querySelector(this.selectors.control).parentElement,
+                    get: function(){
+                        return this.elemMain.value
+                    },
+                    set: function(newValue){
+                        this.elemMain.value = newValue;
+                    }
+                }
+            },
+            dateAndTime: function(fin,guid,displayName){
+                return {
+                    fin: fin,
+                    guid: guid,
+                    fieldDisplayName: displayName,
+                    fieldType: "SPFieldDateTime",
+                    fieldSubType: "DateAndTime",
+                    selectors: {
+                        control: "INPUT[id='"+ fin +"_"+ guid +"_$DateTimeFieldDate']",
+                        picker: "IMG[id='"+ fin +"_"+ guid +"_$DateTimeFieldDateDatePickerImage']",
+                        hours: "SELECT[id='"+ fin +"_"+ guid +"_$DateTimeFieldDateHours']",
+                        minutes: "SELECT[id='"+ fin +"_"+ guid +"_$DateTimeFieldDateMinutes']"
+                    },
+                    elemMain: document.querySelector(this.selectors.control),
+                    elemPicker: document.querySelector(this.selectors.control).parentElement,
+                    elemHours: document.querySelector(this.selectors.hours),
+                    elemMinutes: document.querySelector(this.selectors.minutes),
+                    get: function(){
+                        return this.elemMain.value
+                    },
+                    set: function(newValue){
+                        this.elemMain.value = newValue;
+                    }
+                }
+            }
+        },
+        SPFieldNumber: function(fin, guid,displayName){
+            return {
+                fin: fin,
+                guid: guid,
+                fieldDisplayName: displayName,
+                fieldType: "SPFieldNumber",
+                fieldSubType: "",
+                selectors: {
+                    control: "INPUT[id='"+ fin +"_"+ guid +"_$NumberField']"
+                },
+                elemMain: document.querySelector(this.selectors.control),
+                get: function(){
+                    return this.elemMain.value
+                },
+                set: function(newValue){
+                    this.elemMain.value = newValue;
+                }
+            }
+        },
+        SPFieldCurrency: function(fin,guid,displayName){
+            return {
+                fin: fin,
+                guid: guid,
+                fieldDisplayName: displayName,
+                fieldType: "SPFieldCurrency",
+                fieldSubType: "",
+                selectors: {
+                    control: "INPUT[id='"+ fin +"_"+ guid +"_$CurrencyField']"
+                },
+                elemMain: document.querySelector(this.selectors.control),
+                get: function(){
+                    return this.elemMain.value
+                },
+                set: function(newValue){
+                    this.elemMain.value = newValue;
+                }
+            }
+        },
+        SPFieldNote: {
+            plain: function(fin,guid,displayName){
+                return {
+                    fin: fin,
+                    guid: guid,
+                    fieldDisplayName: displayName,
+                    fieldType: "SPFieldNote",
+                    fieldSubType: "Plain",
+                    selectors: {
+                        control: "TEXTAREA[id='"+ fin +"_"+ guid +"_$TextField']"
+                    },
+                    elemMain: document.querySelector(this.selectors.control),
+                    get: function(){
+                        return this.elemMain.value
+                    },
+                    set: function(newValue){
+                        this.elemMain.value = newValue;
+                    }
+                }
+            },
+            rich: function(fin,guid,displayName){
+                return {
+                    fin: fin,
+                    guid: guid,
+                    fieldDisplayName: displayName,
+                    fieldType: "SPFieldNote",
+                    fieldSubType: "Rich",
+                    selectors: {
+                        control: "DIV[id='"+ fin +"_"+ guid +"_$TextField_inplacerte']"
+                    },
+                    elemMain: document.querySelector(this.selectors.control),
+                    get: function(){
+                        return this.elemMain.innerHTML
+                    },
+                    set: function(newValue){
+                        this.elemMain.innerHTML = newValue;
+                    }
+                }
+            }
+        },
+        SPFieldChoice: {
+            dropdown: function(fin,guid,displayName){
+                return {
+                    fin: fin,
+                    guid: guid,
+                    fieldDisplayName: displayName,
+                    fieldType: "SPFieldChoice",
+                    fieldSubType: "Dropdown",
+                    selectors: {
+                        control: "SELECT[id='"+ fin +"_"+ guid +"_$DropDownChoice']",
+                        choices: "SELECT[id='"+ fin +"_"+ guid +"_$DropDownChoice'] OPTION",
+                        existingValueIndicator: "INPUT[id='"+ fin +"_"+ guid +"_DropDownButton",
+                        fillInIndicator: "INPUT[id='"+ fin +"_"+ guid +"_FillInButton",
+                        fillIn: "INPUT[id='"+ fin +"_"+ guid +"_$FillInChoice"
+                    },
+                    elemMain: document.querySelector(this.selectors.control),
+                    get: function(){
+                        return this.elemMain.value
+                    },
+                    set: function(newValue){
+                        this.elemMain.value = newValue;
+                    }
+                }
+            },
+            radio: function(fin,guid,displayName){
+                return {
+                    fin: fin,
+                    guid: guid,
+                    fieldDisplayName: displayName,
+                    fieldType: "SPFieldChoice",
+                    fieldSubType: "Radio",
+                    selectors: {
+                        control: "TABLE[id='"+ fin +"_"+ guid +"_ChoiceRadioTable']",
+                        choices: "INPUT[name='"+ fin +"_"+ guid +"_$RadioButtonChoiceField']",
+                        fillInIndicator: "INPUT[id='"+ fin +"_"+ guid +"_$RadioButtonChoiceFieldFillInRadio",
+                        fillIn: "INPUT[id='"+ fin +"_"+ guid +"_$RadioButtonChoiceFieldFillInText"
+                    },
+                    elemMain: document.querySelector(this.selectors.control),
+                    get: function(){
+                        return this.elemMain.value
+                    },
+                    set: function(newValue){
+                        this.elemMain.value = newValue;
+                    }
+                }
+            }
+        },
+        SPFieldMultiChoice: function(fin,guid,displayName){
+            return {
+                fin: fin,
+                guid: guid,
+                fieldDisplayName: displayName,
+                fieldType: "SPFieldMultiChoice",
+                fieldSubType: "",
+                selectors: {
+                    control: "TABLE[id='"+ fin +"_"+ guid +"_MultiChoiceTable']",
+                    choices: "TABLE[id='"+ fin +"_"+ guid +"_MultiChoiceTable'] INPUT[type='checkbox'][id^='"+ fin +"_"+ guid +"_MultiChoiceOption_']",
+                    fillInIndicator: "INPUT[id='"+ fin +"_"+ guid +"FillInRadio",
+                    fillIn: "INPUT[id='"+ fin +"_"+ guid +"FillInText"
+                },
+                elemMain: document.querySelector(this.selectors.control),
+                get: function(){
+                    return this.elemMain.value
+                },
+                set: function(newValue){
+                    this.elemMain.value = newValue;
+                }
+            }
+        },
+        SPFieldLookup: function(fin,guid,displayName){
+            return {
+                fin: fin,
+                guid: guid,
+                fieldDisplayName: displayName,
+                fieldType: "SPFieldLookup",
+                fieldSubType: "",
+                selectors: {
+                    control: "SELECT[id='"+ fin +"_"+ guid +"_$LookupField']"
+                },
+                elemMain: document.querySelector(this.selectors.control),
+                get: function(){
+                    return this.elemMain.value
+                },
+                set: function(newValue){
+                    this.elemMain.value = newValue;
+                }
+            }
+        },
+        SPFieldLookupMulti: function(fin,guid,displayName){
+            return {
+                fin: fin,
+                guid: guid,
+                fieldDisplayName: displayName,
+                fieldType: "SPFieldLookupMulti",
+                fieldSubType: "",
+                selectors: {
+                    possible: "SELECT[id='"+ fin +"_"+ guid +"_SelectCandidate']",
+                    selected: "SELECT[id='"+ fin +"_"+ guid +"_SelectResult']",
+                    addButton: "SELECT[id='"+ fin +"_"+ guid +"_AddButton']",
+                    removeButton: "SELECT[id='"+ fin +"_"+ guid +"_RemoveButton']"
+                },
+                elemPossible: document.querySelector(this.selectors.possible),
+                elemSelected: document.querySelector(this.selectors.selected),
+                get: function(){
+                    return this.elemSelected.childNodes;
+                },
+                set: function(arrNewValue){
+                    for ( var iV = 0; iV < arrNewValue.length; iV++ ){
+                        var lookupOption = document.querySelector(this.selectors.possible +" OPTION[value='"+ arrNewValue[iV] +"']");
+                        pplGrps.log("need to move this to selected",true);
+                        pplGrps.log(lookupOption,true);
+                    }
+                }
+            }
+        },
+        SPFieldBoolean: function(fin,guid,displayName){
+            return {
+                fin: fin,
+                guid: guid,
+                fieldDisplayName: displayName,
+                fieldType: "SPFieldBoolean",
+                fieldSubType: "",
+                selectors: {
+                    control: "INPUT[id='"+ fin +"_"+ guid +"_$BooleanField']"
+                },
+                elemMain: document.querySelector(this.selectors.control),
+                get: function(){
+                    return this.elemMain.getAttribute("checked")
+                },
+                set: function(newValue){
+                    if ( newValue === true ){
+                        this.elemMain.setAttribute("checked","checked");
+                    }
+                    else {
+                        this.elemMain.removeAttribute("checked");
+                    }
+                }
+            }
+        },
+        SPFieldAllDayEvent: function(fin,guid,displayName){
+            return {
+                fin: fin,
+                guid: guid,
+                fieldDisplayName: displayName,
+                fieldType: "SPFieldAllDayEvent",
+                fieldSubType: "",
+                selectors: {
+                    control: "INPUT[id='"+ fin +"_"+ guid +"_AllDayEventField']"
+                },
+                elemMain: document.querySelector(this.selectors.control),
+                get: function(){
+                    return this.elemMain.getAttribute("checked")
+                },
+                set: function(newValue){
+                    if ( newValue === true ){
+                        this.elemMain.setAttribute("checked","checked");
+                    }
+                    else {
+                        this.elemMain.removeAttribute("checked");
+                    }
+                }
+            }
+        },
+        SPFieldRecurrence: function(fin,guid,displayName){
+            return {
+                fin: fin,
+                guid: guid,
+                fieldDisplayName: displayName,
+                fieldType: "SPFieldRecurrence",
+                fieldSubType: "",
+                selectors: {
+                    control: "INPUT[id='"+ fin +"_"+ guid +"_RecurrenceField']",
+                    recurrenceTypeDaily: "INPUT[id*='_RecurrenceDataField_'][id$='recurrencePatternType2']",
+                    recurrenceTypeWeekly: "INPUT[id*='_RecurrenceDataField_'][id$='recurrencePatternType3']",
+                    recurrenceTypeMonthly: "INPUT[id*='_RecurrenceDataField_'][id$='recurrencePatternType4']",
+                    recurrenceTypeYearly: "INPUT[id*='_RecurrenceDataField_'][id$='recurrencePatternType5']",
+                    dailyPatternXDays: "INPUT[id*='_RecurrenceDataField_'][id$='dailyRecurType0']",
+                    dailyPatternXDaysValue: "INPUT[id*='_RecurrenceDataField_'][id$='daily_dayFrequency']",
+                    dailyPatternEveryWeekday: "INPUT[id*='_RecurrenceDataField_'][id$='dailyRecurType1']",
+                    weeklyWeekFrequencyValue: "INPUT[id*='_RecurrenceDataField_'][id$='weekly_weekFrequency']",
+                    weeklyOnSunday: "INPUT[id*='_RecurrenceDataField_'][id$='weekly_multiDays_0']",
+                    weeklyOnMondy: "INPUT[id*='_RecurrenceDataField_'][id$='weekly_multiDays_1']",
+                    weeklyOnTuesday: "INPUT[id*='_RecurrenceDataField_'][id$='weekly_multiDays_2']",
+                    weeklyOnWednesday: "INPUT[id*='_RecurrenceDataField_'][id$='weekly_multiDays_3']",
+                    weeklyOnThursday: "INPUT[id*='_RecurrenceDataField_'][id$='weekly_multiDays_4']",
+                    weeklyOnFriday: "INPUT[id*='_RecurrenceDataField_'][id$='weekly_multiDays_5']",
+                    weeklyOnSaturday: "INPUT[id*='_RecurrenceDataField_'][id$='weekly_multiDays_6']",
+                    monthlyDayXMonth: "INPUT[id*='_RecurrenceDataField_'][id$='monthlyRecurType0']",
+                    monthlyDayXMonthDayValue: "INPUT[id*='_RecurrenceDataField_'][id$='monthly_day']",
+                    monthlyDayXMonthMonthValue: "INPUT[id*='_RecurrenceDataField_'][id$='monthly_monthFrequency']",
+                    monthlyByDay: "INPUT[id*='_RecurrenceDataField_'][id$='monthlyRecurType1']",
+                    monthlyByDayWeekOfMonthValue: "SELECT[id*='_RecurrenceDataField_'][id$='monthlyByDay_weekOfMonth']",
+                    monthlyByDayDayValue: "SELECT[id*='_RecurrenceDataField_'][id$='monthlyByDay_day']",
+                    monthlyByDayFrequencyValue: "INPUT[id*='_RecurrenceDataField_'][id$='monthlyByDay_monthFrequency']",
+                    yearly: "SELECT[id*='_RecurrenceDataField_'][id$='yearlyRecurType0']",
+                    yearlyMonth: "SELECT[id*='_RecurrenceDataField_'][id$='yearly_month']",
+                    yearlyDay: "SELECT[id*='_RecurrenceDataField_'][id$='yearly_day']",
+                    yearlyByDay: "SELECT[id*='_RecurrenceDataField_'][id$='yearlyRecurType1']",
+                    yearlyByDayWeekOfMonthValue: "SELECT[id*='_RecurrenceDataField_'][id$='yearlyByDay_weekOfMonth']",
+                    yearlyByDayDayValue: "SELECT[id*='_RecurrenceDataField_'][id$='yearlyByDay_day']",
+                    yearlyByDayMonthValue: "SELECT[id*='_RecurrenceDataField_'][id$='yearlyByDay_month']",
+                    recurrenceStartDate: "INPUT[id*='_RecurrenceDataField_'][id*='windowStart_windowStartDate']",
+                    recurrenceEndNoDate: "INPUT[id*='_RecurrenceDataField_'][id*='endDateRangeType0']",
+                    recurrenceEndOccurrences: "INPUT[id*='_RecurrenceDataField_'][id*='endDateRangeType1']",
+                    recurrenceEndOccurrencesValue: "INPUT[id*='_RecurrenceDataField_'][id*='repeatInstances']",
+                    recurrenceEndByDate: "INPUT[id*='_RecurrenceDataField_'][id*='endDateRangeType2']",
+                    recurrenceEndByDateValue: "INPUT[id*='_RecurrenceDataField_'][id*='windowEnd_windowEndDate']"
+                },
+                elemMain: document.querySelector(this.selectors.control),
+                get: function(){
+                    return this.elemMain.getAttribute("checked")
+                },
+                set: function(newValue){
+                    if ( newValue === true ){
+                        this.elemMain.setAttribute("checked","checked");
+                    }
+                    else {
+                        this.elemMain.removeAttribute("checked");
+                    }
+                }
+            }
+        },
+        SPFieldOverbook: function(fin,guid,displayName){
+            return {
+                fin: fin,
+                guid: guid,
+                fieldDisplayName: displayName,
+                fieldType: "SPFieldOverbook",
+                fieldSubType: "",
+                selectors: {
+                    control: "INPUT[id='"+ fin +"_"+ guid +"_btnCheckOverbook']"
+                },
+                elemMain: document.querySelector(this.selectors.control),
+                get: function(){},
+                set: function(){}
+            }
+        },
+        SPFieldFreeBusy: function(fin,guid,displayName){
+            return {
+                fin: fin,
+                guid: guid,
+                fieldDisplayName: displayName,
+                fieldType: "SPFieldFreeBusy",
+                fieldSubType: "",
+                selectors: {
+                    control: "DIV[id='FreeBusyRootDiv']"
+                },
+                elemMain: document.querySelector(this.selectors.control),
+                get: function(){},
+                set: function(){}
+            }
+        },
+        SPFieldFacilities: function(fin, guid,displayName){
+            return {
+                fin: fin,
+                guid: guid,
+                fieldDisplayName: displayName,
+                fieldType: "SPFieldFacilities",
+                fieldSubType: "",
+                selectors: {
+                    control: "SELECT[type='text'][id='"+ fin +"_"+ guid +"_SelectCandidate']"
+                },
+                elements: {
+                    main: document.querySelector(this.selectors.control)
+                },
+                get: function(){
+                    return this.elements.main.value
+                },
+                set: function(newValue){
+                    this.elements.main.value = newValue;
+                }
+            }
+        },
+        SPFieldUser: {
+            peopleOnly: function(fin,guid,displayName){
+                return {
+                    fin: fin,
+                    guid: guid,
+                    fieldDisplayName: displayName,
+                    fieldType: "SPFieldUser",
+                    fieldSubType: "PeopleOnly",
+                    allowMultiple: false,
+                    selectors: {
+                        control: "DIV[id='"+ fin +"_"+ guid +"_$ClientPeoplePicker']",
+                        initialHelpText: "SPAN[id='"+ fin +"_"+ guid +"_$ClientPeoplePicker_InitialHelpText']",
+                        waitImage: "IMG[id='"+ fin +"_"+ guid +"_$ClientPeoplePicker_WaitImage']",
+                        resolvedList: "SPAN[id='"+ fin +"_"+ guid +"_$ClientPeoplePicker_ResolvedList']",
+                        editorInput: "INPUT[id='"+ fin +"_"+ guid +"_$ClientPeoplePicker_EditorInput']",
+                        fieldDisplayName: displayName,
+                        legacy: "DIV[id$='_UserField_upLevelDiv'][title='"+this.fieldDisplayName+"']",
+                        legacyOuterTable: "TABLE[id$='_UserField_OuterTable']",
+                        legacyCheckNames: "A[id$='_UserField_checkNames']",
+                        legacyBrowse: "A[id$='_UserField_browse']"
+                    },
+                    elemMain: document.querySelector(this.selectors.control),
+                    get: function(){
+                        return this.elemMain.value;
+                    },
+                    set: function(newValue ){
+                        this.elemMain.value = newValue;
+                    }
+                }
+            },
+            peopleOrGroups: function(fin,guid,displayName){
+                return {
+                    fin: fin,
+                    guid: guid,
+                    fieldDisplayName: displayName,
+                    fieldType: "SPFieldUser",
+                    fieldSubType: "PeopleOrGroups",
+                    allowMultiple: false,
+                    selectors: {
+                        control: "DIV[id='"+ fin +"_"+ guid +"_$ClientPeoplePicker']",
+                        initialHelpText: "SPAN[id='"+ fin +"_"+ guid +"_$ClientPeoplePicker_InitialHelpText']",
+                        waitImage: "IMG[id='"+ fin +"_"+ guid +"_$ClientPeoplePicker_WaitImage']",
+                        resolvedList: "SPAN[id='"+ fin +"_"+ guid +"_$ClientPeoplePicker_ResolvedList']",
+                        editorInput: "INPUT[id='"+ fin +"_"+ guid +"_$ClientPeoplePicker_EditorInput']",
+                        fieldDisplayName: displayName,
+                        legacy: "DIV[id$='_UserField_upLevelDiv'][title='"+this.fieldDisplayName+"']",
+                        legacyOuterTable: "TABLE[id$='_UserField_OuterTable']",
+                        legacyCheckNames: "A[id$='_UserField_checkNames']",
+                        legacyBrowse: "A[id$='_UserField_browse']"
+                    },
+                    elemMain: document.querySelector(this.selectors.control),
+                    get: function(){
+                        return this.elemMain.value;
+                    },
+                    set: function(newValue ){
+                        this.elemMain.value = newValue;
+                    }
+                }
+            }
+        },
+        SPFieldUserMulti: {
+            peopleOnly: function(fin,guid,displayName){
+                return {
+                    fin: fin,
+                    guid: guid,
+                    fieldDisplayName: displayName,
+                    fieldType: "SPFieldUser",
+                    fieldSubType: "PeopleOnly",
+                    allowMultiple: true,
+                    selectors: {
+                        control: "DIV[id='"+ fin +"_"+ guid +"_$ClientPeoplePicker']",
+                        initialHelpText: "SPAN[id='"+ fin +"_"+ guid +"_$ClientPeoplePicker_InitialHelpText']",
+                        waitImage: "IMG[id='"+ fin +"_"+ guid +"_$ClientPeoplePicker_WaitImage']",
+                        resolvedList: "SPAN[id='"+ fin +"_"+ guid +"_$ClientPeoplePicker_ResolvedList']",
+                        editorInput: "INPUT[id='"+ fin +"_"+ guid +"_$ClientPeoplePicker_EditorInput']",
+                        fieldDisplayName: displayName,
+                        legacy: "DIV[id$='_UserField_upLevelDiv'][title='"+this.fieldDisplayName+"']",
+                        legacyOuterTable: "TABLE[id$='_UserField_OuterTable']",
+                        legacyCheckNames: "A[id$='_UserField_checkNames']",
+                        legacyBrowse: "A[id$='_UserField_browse']"
+                    },
+                    elemMain: document.querySelector(this.selectors.control),
+                    get: function(){
+                        return this.elemMain.value;
+                    },
+                    set: function(newValue ){
+                        this.elemMain.value = newValue;
+                    }
+                }
+            },
+            peopleOrGroups: function(fin,guid,displayName){
+                return {
+                    fin: fin,
+                    guid: guid,
+                    fieldDisplayName: displayName,
+                    fieldType: "SPFieldUser",
+                    fieldSubType: "PeopleOrGroups",
+                    allowMultiple: true,
+                    selectors: {
+                        control: "DIV[id='"+ fin +"_"+ guid +"_$ClientPeoplePicker']",
+                        initialHelpText: "SPAN[id='"+ fin +"_"+ guid +"_$ClientPeoplePicker_InitialHelpText']",
+                        waitImage: "IMG[id='"+ fin +"_"+ guid +"_$ClientPeoplePicker_WaitImage']",
+                        resolvedList: "SPAN[id='"+ fin +"_"+ guid +"_$ClientPeoplePicker_ResolvedList']",
+                        editorInput: "INPUT[id='"+ fin +"_"+ guid +"_$ClientPeoplePicker_EditorInput']",
+                        fieldDisplayName: displayName,
+                        legacy: "DIV[id$='_UserField_upLevelDiv'][title='"+this.fieldDisplayName+"']",
+                        legacyOuterTable: "TABLE[id$='_UserField_OuterTable']",
+                        legacyCheckNames: "A[id$='_UserField_checkNames']",
+                        legacyBrowse: "A[id$='_UserField_browse']"
+                    },
+                    elemMain: document.querySelector(this.selectors.control),
+                    get: function(){
+                        return this.elemMain.value;
+                    },
+                    set: function(newValue ){
+                        this.elemMain.value = newValue;
+                    }
+                }
+            }
+        },
+        SPFieldUrl: {
+            hyperlink: function(fin,guid,displayName){
+                return {
+                    fin: fin,
+                    guid: guid,
+                    fieldDisplayName: displayName,
+                    fieldType: "SPFieldURL",
+                    fieldSubType: "Hyperlink",
+                    selectors: {
+                        control: "INPUT[id='"+ fin +"_"+ guid +"_$UrlFieldUrl']",
+                        description: "INPUT[id='"+ fin +"_"+ guid +"_$UrlFieldDescription']"
+                    },
+                    elemMain: document.querySelector(this.selectors.control),
+                    elemDescription: document.querySelector(this.selectors.description),
+                    get: function(){
+                        try{
+                            return "<a href='"+ this.elemMain.value +"'>"+ this.elemDescription.value +"</a>";
+                        }
+                        catch(err){
+                            return "<a href='"+ this.elemMain.value +"'>"+ this.elemMain.value +"</a>";
+                        }
+                    },
+                    set: function(newValueUrl, newValueDescription ){
+                        this.elemMain.value = newValueUrl;
+                        this.elemDescription.value = newValueDescription;
+                    }
+                }
+            },
+            picture: function(fin,guid,displayName){
+                return {
+                    fin: fin,
+                    guid: guid,
+                    fieldDisplayName: displayName,
+                    fieldType: "SPFieldURL",
+                    fieldSubType: "Picture",
+                    selectors: {
+                        control: "INPUT[id='"+ fin +"_"+ guid +"_$UrlFieldUrl']",
+                        description: "INPUT[id='"+ fin +"_"+ guid +"_$UrlFieldDescription']"
+                    },
+                    elemMain: document.querySelector(this.selectors.control),
+                    elemDescription: document.querySelector(this.selectors.description),
+                    get: function(){
+                        try{
+                            return "<a href='"+ this.elemMain.value +"'>"+ this.elemDescription.value +"</a>";
+                        }
+                        catch(err){
+                            return "<a href='"+ this.elemMain.value +"'>"+ this.elemMain.value +"</a>";
+                        }
+                    },
+                    set: function(newValueUrl, newValueDescription ){
+                        this.elemMain.value = newValueUrl;
+                        this.elemDescription.value = newValueDescription;
+                    }
+                }
+            }
+        }
+    },
     log: function (message, bIgnoreDebugReq) {
         if (typeof (bIgnoreDebugReq) === "undefined") {
             var bIgnoreDebugReq = false;
@@ -323,38 +967,39 @@ var pplGrps = pplGrps || {
             });
         },
         captureSettings: function (formURL, fieldName, blbSettings) {
-            /*
-            var formURL = _spPageContextInfo.serverRequestPath;
-            var fieldName = "PrimaryResource"
-            var blbSettings = JSON.stringify({
-                "fieldDisplayName":"PrimaryResource",
-                "bCaptureProfileDetails":true,
-                "arrMapping":[
-                    {"fin":"ResourceAccount","userProperty":"pplGrps.userProperties.LoginName"},
-                    {"fin":"ResourceEmail","userProperty":"pplGrps.userProperties.Email"},
-                    {"fin":"ResourceGroups","userProperty":"pplGrps.userProperties.Groups.results"},
-                    {"fin":"ResourcePeers","userProperty":"pplGrps.userProperties.Groups.results|Users.results"}
-                ]
-            });
-            */
-            var oItem = {
-                __metadata: {
-                    type: 'SP.Data.DsMagicpplGrpsListItem'
-                },
-                Title: formURL,
-                fieldName: fieldName,
-                blbSettings: JSON.stringify(blbSettings)
-            };
-            pplGrps.ajax.create(_spPageContextInfo.webAbsoluteUrl + "/_api/web/lists/GetByTitle('dsMagic-pplGrps')/Items", JSON.stringify(oItem), function (x, d) {
-                pplGrps.log("Created list item for Settings");
-                pplGrps.log(x);
-                pplGrps.log(d);
-                if (confirm("Settings have been saved. Would you like to refresh the page?") === true) {
-                    window.location.reload();
-                }
-            }, function () {
-                pplGrps.log("Failed to create list item for Settings", true);
-            });
+            var existingSettings = pplGrps.checkIfSettingsExistForField(fieldName);
+            if ( existingSettings > 0 ){
+                pplGrps.log("Updating existing settings list item",true);
+                pplGrps.ajax.updateSettings(pplGrps.currentSettings[fieldName].Id, blbSettings);
+            }
+            else {
+                pplGrps.log("Saving new settings list item",true);
+                var oItem = {
+                    __metadata: {
+                        type: 'SP.Data.DsMagicpplGrpsListItem'
+                    },
+                    Title: formURL,
+                    fieldName: fieldName,
+                    blbSettings: JSON.stringify(blbSettings)
+                };
+                pplGrps.ajax.create(
+                    _spPageContextInfo.webAbsoluteUrl + "/_api/web/lists/GetByTitle('dsMagic-pplGrps')/Items", 
+                    JSON.stringify(oItem), 
+                    function (x, d) {
+                        pplGrps.log("Created list item for Settings");
+                        pplGrps.log(x);
+                        pplGrps.log(d);
+                        if (confirm("Settings have been saved. Would you like to refresh the page?") === true) {
+                            window.location.reload();
+                        }
+                    }, function (x,s,e) {
+                        pplGrps.log("Failed to create list item for Settings", true);
+                        pplGrps.log(x, true);
+                        pplGrps.log(s, true);
+                        pplGrps.log(e, true);
+                    }
+                );
+            }
         },
         getSettings: function (fxAfter, fxFailed) {
             var restURL = _spPageContextInfo.webAbsoluteUrl + "/_api/web/lists/GetByTitle('dsMagic-pplGrps')/Items?$filter=Title eq '" + _spPageContextInfo.serverRequestPath + "'";
@@ -364,6 +1009,10 @@ var pplGrps = pplGrps || {
                     pplGrps.settings.push(d.d.results[iD]);
                     var blbSettings = JSON.parse(d.d.results[iD].blbSettings);
                     pplGrpsListeners.push(blbSettings);
+                    pplGrps.currentSettings[d.d.results[iD].fieldName] = {
+                        blbSettings: blbSettings,
+                        Id: d.d.results[iD].Id
+                    };
                 }
             }, function (xLast, dLast) {
                 pplGrps.log("Last page of settings", true);
@@ -378,20 +1027,34 @@ var pplGrps = pplGrps || {
                 }
             });
         },
+        checkIfSettingsExistForField: function(fin){
+            var finSettingsId = 0;
+            for ( fieldInternalName in pplGrps.currentSettings ){
+                if ( fieldInternalName === fin ) {
+                    finSettingsId = pplGrps.currentSettings[fieldInternalName].Id;
+                    break;
+                }
+            }
+            return finSettingsId;
+        },
         updateSettings: function (itemID, blbSettings) {
             var oItem = {
                 __metadata: {
-                    type: 'SP.Data.DsMagicpickersListItem'
+                    type: 'SP.Data.DsMagicpplGrpsListItem'
                 },
                 blbSettings: JSON.stringify(blbSettings)
             };
-            pplGrps.ajax.update(_spPageContextInfo.webAbsoluteUrl + "/_api/web/lists/GetByTitle('dsMagic-pplGrps')/Items(" + itemID + ")", JSON.stringify(oItem), function (x, d) {
-                pplGrps.log("Updated list item for Settings", true);
-                pplGrps.log(x, true);
-                pplGrps.log(d, true);
-            }, function () {
-                pplGrps.log("Failed to update list item for Settings", true);
-            });
+            pplGrps.ajax.update(
+                _spPageContextInfo.webAbsoluteUrl + "/_api/web/lists/GetByTitle('dsMagic-pplGrps')/Items(" + itemID + ")", 
+                JSON.stringify(oItem), 
+                function (x, d) {
+                    pplGrps.log("Updated list item for Settings", true);
+                    pplGrps.log(x, true);
+                    pplGrps.log(d, true);
+                }, function () {
+                    pplGrps.log("Failed to update list item for Settings", true);
+                }
+            );
         },
         checkIfSettingsListExists: function (fxExists, fxDoesNotExist) {
             var restURL = _spPageContextInfo.webAbsoluteUrl + "/_api/web/lists/GetByTitle('dsMagic-pplGrps')";
@@ -595,14 +1258,13 @@ var pplGrps = pplGrps || {
                     FieldInternalName = FieldInternalName.substr(0,FieldInternalName.indexOf("\n")-1);
                     var FieldType = firstComment.substr(firstComment.indexOf("FieldType=")+11,200);
                     FieldType = FieldType.substr(0,FieldType.indexOf("\n")-1);
-                    /*pplGrps.log(FieldName +"|"+ FieldInternalName +"|"+ FieldType,true);*/
+                    pplGrps.log(FieldName +"|"+ FieldInternalName +"|"+ FieldType);
                     pplGrps.formFields["dsWPQ"+webPart+"FormCtx"][FieldInternalName] = {
                         Description: "",
                         Direction: "none",
                         FieldType: FieldType,
                         Hidden: false,
                         IMEMode: null,
-                        /*Id: fieldGUID,*/
                         Id: "",
                         Name: FieldInternalName,
                         ReadOnlyField: false,
@@ -621,9 +1283,6 @@ var pplGrps = pplGrps || {
                             document.getElementById(controlID).onkeyup = function onkeyup(event) {
                                 pplGrps.log(controlID);
                                 pplGrps.log(event);
-                                //var keyboardEvent = onKeyUpRw(controlID.replace("_upLevelDiv",""));
-                                //pplGrps.log(keyboardEvent,true);
-                                //pplGrps.instances[controlID].spcsom.OnUserResolvedClientScript(controlID, pplGrps.instances[controlID].spcsom.GetAllUserInfo())
                                 if ( event.which === 13 ){
                                     // user pressed 'enter'
                                     setTimeout(function(){
@@ -636,50 +1295,12 @@ var pplGrps = pplGrps || {
                                         pplGrps.instances[controlID].spcsom.OnUserResolvedClientScript(controlID, pplGrps.instances[controlID].spcsom.GetAllUserInfo())
                                     },2000);
                                 }
-                                //return keyboardEvent;
                                 return event;
                             }
                         };
                         fxSetOnKeyUp(pplGrps.formFields["dsWPQ"+webPart+"FormCtx"][FieldInternalName].TopLevelElementId);
 
-                        /*
-                        var fxSetOnChange = function(controlID){
-                            document.getElementById(controlID).onchange = function onchange(event) {
-                                pplGrps.log("onchange",true);
-                                pplGrps.log(controlID,true);
-                                pplGrps.log(event,true);
-                                //pplGrps.instances[controlID].spcsom.OnUserResolvedClientScript(controlID, pplGrps.instances[controlID].spcsom.GetAllUserInfo())
-                                updateControlValue(controlID.replace("_upLevelDiv",""));
-                            }
-                        };
-                        fxSetOnChange(pplGrps.formFields["dsWPQ"+webPart+"FormCtx"][FieldInternalName].TopLevelElementId);
-                        */
-
-                        var fxSetOnBlur = function(controlID){
-                            document.getElementById(controlID).onblur = function onblur(event) {
-                                pplGrps.log("onblur",true);
-                                pplGrps.log(controlID);
-                                pplGrps.log(event);
-                                //pplGrps.instances[controlID].spcsom.OnUserResolvedClientScript(controlID, pplGrps.instances[controlID].spcsom.GetAllUserInfo())
-                            }
-                        };
-                        fxSetOnBlur(pplGrps.formFields["dsWPQ"+webPart+"FormCtx"][FieldInternalName].TopLevelElementId);
-
-                        /*
-                        var fxSetHiddenInputOnChange = function(controlID){
-                            pplGrps.log("Setup event listener on picker hidden input onchange for control |"+ controlID+"|",true);
-                            //document.getElementById(controlID.replace("_UserField_upLevelDiv","_UserField_hiddenSpanData")).addEventListener("change",function(event) {
-                            document.getElementById(controlID.replace("_UserField_upLevelDiv","_UserField_hiddenSpanData")).onchange = function onchange(event) {
-                                pplGrps.log("onchange",true);
-                                pplGrps.log(controlID.replace("_UserField_upLevelDiv","_UserField_hiddenSpanData"));
-                                pplGrps.log(event);
-                                //pplGrps.instances[controlID].spcsom.OnUserResolvedClientScript(controlID, pplGrps.instances[controlID].spcsom.GetAllUserInfo())
-                            }
-                        };
-                        fxSetHiddenInputOnChange(pplGrps.formFields["dsWPQ"+webPart+"FormCtx"][FieldInternalName].TopLevelElementId);
-                        */
                     }
-                    /*pplGrps.formFields["dsWPQ"+webPart+"FormCtx"][oField.innerHTML.substr(0,)]*/
                 }
             }
             if (typeof (fxEach) === "function") {
@@ -1161,6 +1782,38 @@ var pplGrps = pplGrps || {
                                             var setField = pplGrps.findFormField("Name", oListener.arrMapping[iMapping].fin);
                                             pplGrps.log(setField,true);
                                             var setFieldElement = document.querySelector("[id*='" + setField.Id + "']");
+                                            if ( setFieldElement === null ){
+                                                switch (setField.FieldType){
+                                                    case "SPFieldDateTime":
+                                                        break;
+                                                    case "SPFieldNote":
+                                                        break;
+                                                    case "SPFieldChoice":
+                                                        break;
+                                                    case "SPFieldMultiChoice":
+                                                        break;
+                                                    case "SPFieldLookup":
+                                                        break;
+                                                    case "SPFieldLookupMulti":
+                                                        break;
+                                                    case "SPFieldAllDayEvent":
+                                                        break;
+                                                    case "SPFieldRecurrence":
+                                                        break;
+                                                    case "SPFieldOverbook":
+                                                        break;
+                                                    case "SPFieldFreeBusy":
+                                                        break;
+                                                    case "SPFieldFacilities":
+                                                        break;
+                                                    case "SPFieldUser":
+                                                        break;
+                                                    case "SPFieldUserMulti":
+                                                        break;
+                                                    default: 
+                                                        setFieldElement = document.querySelectorAll(".ms-formbody INPUT[title^='"+ setField.Name +"']");
+                                                }
+                                            }
                                             pplGrps.log(setFieldElement);
                                             pplGrps.log(setFieldElement.tagName);
                                             pplGrps.log(setFieldElement.className);
@@ -1262,6 +1915,7 @@ var pplGrps = pplGrps || {
                 var pickerConfigWrapper = document.getElementById(pickerTopLevelElementId + "_configWrapper");
                 if (listener.bCaptureProfileDetails === true) {
                     var pickerConfigMappingTBODY = document.getElementById(pickerTopLevelElementId + "_configMappingRowsWrapper");
+                    pplGrps.log(pickerConfigMappingTBODY,true);
                     var mappingRow = pickerConfigMappingTBODY.querySelector(".mappingRow");
                     for (var iMapping = 0; iMapping < listener.arrMapping.length; iMapping++) {
                         pplGrps.log(listener.arrMapping[iMapping]);
