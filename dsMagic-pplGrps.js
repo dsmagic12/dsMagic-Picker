@@ -1993,7 +1993,7 @@ var pplGrps = pplGrps || {
         //pplGrps.populateCurrentSettings();
     },
     appendConfigStyles: function () {
-        var arrStyles = [".pplGrpsConfigPopup {display: none; background-color: #e6e6e6; border: 1px solid black; padding: 5px 10px; margin-top: 3px;}"];
+        var arrStyles = [".pplGrpsConfigPopup {display: none; background-color: #e6e6e6; border: 1px solid black; padding: 5px 10px; margin-top: 3px; width: fit-content;}"];
         arrStyles.push(".configPopupHeader {text-align: right;}");
         arrStyles.push(".configPopupFooter {margin-top: 3px;}");
         arrStyles.push(".buttonish {cursor: pointer; border: 1px solid black; padding: 1px 10px;}");
