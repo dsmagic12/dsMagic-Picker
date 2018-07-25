@@ -924,6 +924,7 @@ var pplGrps = pplGrps || {
     bDebug: false,
     editMode: false,
     userCanEditSettings: false,
+    PeopleManagerServiceUnavailable: false,
     currentSettings: {},
     listFields: [],
     log: function (message, bIgnoreDebugReq) {
@@ -1052,9 +1053,12 @@ var pplGrps = pplGrps || {
             };
             xhr.send(object);
         },
-        read: function (restURL, fxCallback, fxLastPage, fxFailed, sDataType) {
+        read: function (restURL, fxCallback, fxLastPage, fxFailed, sDataType, bCache) {
             if (typeof (sDataType) === "undefined") {
                 var sDataType = "json";
+            }
+            if ( typeof(bCache) === "undefined" ){
+                var bCache = true;
             }
             pplGrps.ajax.lastCall = {
                 xhr: null,
@@ -1066,12 +1070,14 @@ var pplGrps = pplGrps || {
             };
             var xhr = new XMLHttpRequest();
             xhr.open('GET', restURL, true);
-            var now = new Date();
-            /* 4 hours later */
-            var later = new Date(now.valueOf() + (1000 * 60 * 60 * 4));
-            xhr.setRequestHeader("Expires", later);
-            xhr.setRequestHeader("Last-Modified", now);
-            xhr.setRequestHeader("Cache-Control", "Public");
+            if  ( bCache === true ){
+                var now = new Date();
+                /* 4 hours later */
+                var later = new Date(now.valueOf() + (1000 * 60 * 60 * 4));
+                xhr.setRequestHeader("Expires", later);
+                xhr.setRequestHeader("Last-Modified", now);
+                xhr.setRequestHeader("Cache-Control", "Public");
+            }
             xhr.setRequestHeader("X-RequestDigest", document.getElementById("__REQUESTDIGEST").value);
             switch (sDataType) {
                 case "json":
@@ -1483,6 +1489,148 @@ var pplGrps = pplGrps || {
                 pplGrps.log("failed to get user properties");
             }
         );
+    },
+    getUserProfileFromPeopleManager: function(loginName, afterFx, pickerID, userKey){
+        /*http://expertsoverlunch.com/sandbox/_api/SP.UserProfiles.PeopleManager/getPropertiesFor(@v)?@v=%27i%3A0%23.f%7Cexpertsoverlunchmp%7Cdaniel%27*/
+        if ( pplGrps.PeopleManagerServiceUnavailable === false ){
+            pplGrps.log("Requesting user profile via SP.UserProfiles.PeopleManager service",true);
+            pplGrps.ajax.read(
+                _spPageContextInfo.webAbsoluteUrl + "/_api/SP.UserProfiles.PeopleManager/getPropertiesFor(@v)?@v=%27" + loginName + "%27",
+                function (xhr, data) {
+                    var returnUserObject = null;
+                    /* first expand user info under pplGrps.userProperties */
+                    pplGrps.userProperties["PeopleManagerProfile"] = data.d;
+                    if ( typeof(data.d.UserProfileProperties) !== "undefined" ){
+                        var arrUserProfileProps = data.d.UserProfileProperties;
+                        for ( var iUPP = 0; iUPP < arrUserProfileProps.length; iUPP++ ){
+                            profileProp = arrUserProfileProps[iUPP];
+                            pplGrps.userProperties[profileProp.Key] = profileProp.Value;
+                        }
+                    }
+                    pplGrps.log("Expanded SP user at pplGrps.userProperties via SP.UserProfiles.PeopleManager service",true);
+                    pplGrps.log(pplGrps.userProperties,true);
+                    returnUserObject = pplGrps.userProperties;
+                    /* now expand user info under pplGrps.instances[pickerID].users[userKey] */
+                    if ( typeof(pickerID) !== "undefined" && typeof(userKey) !== "undefined" ) {
+                        if ( typeof(pplGrps.instances[pickerID]) !== "undefined" ){
+                            if ( typeof(pplGrps.instances[pickerID].users[userKey]) !== "undefined" ){
+                                pplGrps.instances[pickerID].users[userKey]["PeopleManagerProfile"] = data.d;
+                                if ( typeof(data.d.UserProfileProperties) !== "undefined" ){
+                                    var arrUserProfileProps = data.d.UserProfileProperties;
+                                    for ( var iUPP = 0; iUPP < arrUserProfileProps.length; iUPP++ ){
+                                        profileProp = arrUserProfileProps[iUPP];
+                                        pplGrps.instances[pickerID].users[userKey][profileProp.Key] = profileProp.Value;
+                                    }
+                                }
+                                pplGrps.log("Expanded SP user at pplGrps.instances['"+ pickerID +"'].users['"+ userKey +"'] via SP.UserProfiles.PeopleManager service",true);
+                                returnUserObject = pplGrps.instances[pickerID].users[userKey];
+                            }    
+                        }
+                    }
+                    if (typeof (afterFx) === "function") {
+                        afterFx(returnUserObject);
+                    }
+                },
+                function (xhr, data) {
+                    pplGrps.log("Processed last page of rest results for the user profile retrieved via SP.UserProfiles.PeopleManager service",true);
+                },
+                function (xhr, data, status) {
+                    pplGrps.log("Failed to get user profile via SP.UserProfiles.PeopleManager service",true);
+                    pplGrps.log(xhr,true);
+                    pplGrps.log(data,true);
+                    pplGrps.log(status,true);
+                    pplGrps.PeopleManagerServiceUnavailable = true;
+                }
+            );
+        }
+        else {
+            pplGrps.log("The SP.UserProfiles.PeopleManager service seems to be unavailable, returning basic user profile",true);
+            var returnUserObject = null;
+            if ( typeof(pplGrps.userProperties) !== "undefined" ){
+                returnUserObject = pplGrps.userProperties;
+            }
+            if ( typeof(pickerID) !== "undefined" && typeof(userKey) !== "undefined" ) {
+                if ( typeof(pplGrps.instances[pickerID]) !== "undefined" ){
+                    if ( typeof(pplGrps.instances[pickerID].users[userKey]) !== "undefined" ){
+                        returnUserObject = pplGrps.userProperties;
+                    }
+                }
+            }
+            if (typeof (afterFx) === "function") {
+                afterFx(returnUserObject);
+            }
+        }
+    },
+    getCurrentUserProfileFromPeopleManager: function(afterFx, pickerID, userKey){
+        /*http://expertsoverlunch.com/sandbox/_api/SP.UserProfiles.PeopleManager/getPropertiesFor(@v)?@v=%27i%3A0%23.f%7Cexpertsoverlunchmp%7Cdaniel%27*/
+        if ( pplGrps.PeopleManagerServiceUnavailable === false ){
+            pplGrps.log("Requesting user profile via SP.UserProfiles.PeopleManager service",true);
+            pplGrps.ajax.read(
+                _spPageContextInfo.webAbsoluteUrl + "/_api/SP.UserProfiles.PeopleManager/getmyproperties",
+                function (xhr, data) {
+                    var returnUserObject = null;
+                    /* first expand user info under pplGrps.userProperties */
+                    pplGrps.userProperties["PeopleManagerProfile"] = data.d;
+                    if ( typeof(data.d.UserProfileProperties) !== "undefined" ){
+                        var arrUserProfileProps = data.d.UserProfileProperties;
+                        for ( var iUPP = 0; iUPP < arrUserProfileProps.length; iUPP++ ){
+                            profileProp = arrUserProfileProps[iUPP];
+                            pplGrps.userProperties[profileProp.Key] = profileProp.Value;
+                        }
+                    }
+                    pplGrps.log("Expanded SP user at pplGrps.userProperties via SP.UserProfiles.PeopleManager service",true);
+                    pplGrps.log(pplGrps.userProperties,true);
+                    returnUserObject = pplGrps.userProperties;
+                    /* now expand user info under pplGrps.instances[pickerID].users[userKey] */
+                    if ( typeof(pickerID) !== "undefined" && typeof(userKey) !== "undefined" ) {
+                        if ( typeof(pplGrps.instances[pickerID]) !== "undefined" ){
+                            if ( typeof(pplGrps.instances[pickerID].users[userKey]) !== "undefined" ){
+                                pplGrps.instances[pickerID].users[userKey]["PeopleManagerProfile"] = data.d;
+                                if ( typeof(data.d.UserProfileProperties) !== "undefined" ){
+                                    var arrUserProfileProps = data.d.UserProfileProperties;
+                                    for ( var iUPP = 0; iUPP < arrUserProfileProps.length; iUPP++ ){
+                                        profileProp = arrUserProfileProps[iUPP];
+                                        pplGrps.instances[pickerID].users[userKey][profileProp.Key] = profileProp.Value;
+                                    }
+                                }
+                                pplGrps.log("Expanded SP user at pplGrps.instances['"+ pickerID +"'].users['"+ userKey +"'] via SP.UserProfiles.PeopleManager service",true);
+                                returnUserObject = pplGrps.instances[pickerID].users[userKey];
+                            }    
+                        }
+                    }
+                    if (typeof (afterFx) === "function") {
+                        afterFx(returnUserObject);
+                    }
+                },
+                function (xhr, data) {
+                    pplGrps.log("Processed last page of rest results for the user profile retrieved via SP.UserProfiles.PeopleManager service",true);
+                },
+                function (xhr, data, status) {
+                    pplGrps.log("Failed to get user profile via SP.UserProfiles.PeopleManager service",true);
+                    pplGrps.log(xhr,true);
+                    pplGrps.log(data,true);
+                    pplGrps.log(status,true);
+                    pplGrps.PeopleManagerServiceUnavailable = true;
+                }
+            );
+        }
+        else {
+            pplGrps.log("The SP.UserProfiles.PeopleManager service seems to be unavailable, returning basic user profile",true);
+            var returnUserObject = null;
+            if ( typeof(pplGrps.userProperties) !== "undefined" ){
+                returnUserObject = pplGrps.userProperties;
+            }
+            if ( typeof(pickerID) !== "undefined" && typeof(userKey) !== "undefined" ) {
+                if ( typeof(pplGrps.instances[pickerID]) !== "undefined" ){
+                    if ( typeof(pplGrps.instances[pickerID].users[userKey]) !== "undefined" ){
+                        returnUserObject = pplGrps.userProperties;
+                    }
+                }
+            }
+            if (typeof (afterFx) === "function") {
+                afterFx(returnUserObject);
+            }
+        }
     },
     getPageWebPartsAndFormFields: function (fxEach, afterFx) {
         var collWPs = document.querySelectorAll("[id^='MSOZoneCell_WebPartWPQ']");
