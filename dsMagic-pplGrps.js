@@ -2287,6 +2287,7 @@ var pplGrps = pplGrps || {
                                                                 pplGrps.log("Setting userproperty mapping by looping through sub-array");
                                                                 var subLoop = eval("setUserProperty[" + iG + "]." + setUserSubProperty);
                                                                 pplGrps.log(subLoop);
+                                                                pplGrps.emptyPicker(pplGrps.findFormField("Name", oListener.arrMapping[iMapping].fin).TopLevelElementId);
                                                                 for (var iU = 0; iU < subLoop.length; iU++) {
                                                                     pplGrps.log("pplGrps adding person or group to field with fin |" + oListener.arrMapping[iMapping].fin + "|", true);
                                                                     /*SPClientPeoplePicker.SPClientPeoplePickerDict[pplGrps.findFormField("Name", oListener.arrMapping[iMapping].fin).TopLevelElementId].AddUserKeys(subLoop[iU].LoginName);*/
@@ -2297,6 +2298,7 @@ var pplGrps = pplGrps || {
                                                             } else {
                                                                 pplGrps.log("pplGrps adding person or group to field with fin |" + oListener.arrMapping[iMapping].fin + "|", true);
                                                                 /*SPClientPeoplePicker.SPClientPeoplePickerDict[pplGrps.findFormField("Name", oListener.arrMapping[iMapping].fin).TopLevelElementId].AddUserKeys(setUserProperty[iG].LoginName);*/
+                                                                pplGrps.emptyPicker(pplGrps.findFormField("Name", oListener.arrMapping[iMapping].fin).TopLevelElementId);
                                                                 pplGrps.instances[pplGrps.findFormField("Name", oListener.arrMapping[iMapping].fin).TopLevelElementId].spcsom.AddUserKeys(setUserProperty[iG].LoginName);
                                                                 //pickerInstance.spcsom.AddUserKeys(setUserProperty[iG].LoginName);
                                                             }
@@ -2323,11 +2325,12 @@ var pplGrps = pplGrps || {
                                                 }
                                                 else if (setFieldElement.tagName === "DIV" /*&& setFieldElement.className.indexOf("sp-peoplepicker-topLevel") >= 0*/ ) {
                                                     /* picker */
+                                                    pplGrps.emptyPicker(setFieldElement.id);
                                                     pplGrps.instances[setFieldElement.id].spcsom.AddUserKeys(eval(oListener.arrMapping[iMapping].userProperty));
                                                     
                                                 }
                                                 else if (setFieldElement.tagName === "SPAN" && setFieldElement.className.indexOf("ms-usereditor") >= 0 ) {
-                                                    
+                                                    //pplGrps.emptyPicker(setFieldElement.id);
                                                     pplGrps.legacyInstances[setFieldElement.id+"_upLevelDiv"].spcsom.AddUserKeys(eval(oListener.arrMapping[iMapping].userProperty));
                                                 }
                                             }
@@ -2341,6 +2344,13 @@ var pplGrps = pplGrps || {
                     pplGrps.log("set instance's spcsom.OnUserResolvedClientScript for |"+ pickerFormField.TopLevelElementId +"|",true);
                 }
             }
+        }
+    },
+    emptyPicker: function(instanceName){
+        var oPicker = pplGrps.instances[instanceName].spcsom;
+        var collUsers = oPicker.GetAllUserInfo();
+        for ( var iUser = 0; iUser < collUsers.length; iUser++ ) {
+            oPicker.DeleteProcessedUser(document.getElementById(oPicker.TopLevelElementId +"_ResolvedList").childNodes[0])
         }
     },
     populateCurrentSettings: function () {
